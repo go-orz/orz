@@ -2,6 +2,7 @@ package orz
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 	"time"
 	"unicode"
@@ -43,4 +44,12 @@ func Debounce(wait time.Duration) func(f func()) {
 		}
 		timer = time.AfterFunc(wait, f)
 	}
+}
+
+func TimeWatch(name string) {
+	start := time.Now()
+	defer func() {
+		cost := time.Since(start)
+		fmt.Printf("%s: %v\n", name, cost)
+	}()
 }

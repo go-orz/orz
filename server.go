@@ -4,10 +4,9 @@ import (
 	"context"
 	"errors"
 	"github.com/go-orz/orz/config"
+	"github.com/go-orz/orz/x"
 	"github.com/labstack/echo/v4"
-	"github.com/spf13/cast"
 	"go.uber.org/zap"
-	"net"
 	"net/http"
 )
 
@@ -18,8 +17,12 @@ type Server interface {
 }
 
 func NewServer(cfg config.Server, logger *zap.Logger) Server {
+
+	e := echo.New()
+	e.IPExtractor = x.IPExtractor()
+
 	return &server{
-		e:      echo.New(),
+		e:      e,
 		cfg:    cfg,
 		logger: logger,
 	}
@@ -41,8 +44,7 @@ func (r *server) Start() {
 		cfg := r.cfg
 		logger := r.logger
 
-		addr := net.JoinHostPort(cfg.Host, cast.ToString(cfg.Port))
-
+		addr := cfg.Addr
 		logger.Sugar().Infof("http server start at: %v", addr)
 
 		var err error

@@ -18,7 +18,7 @@ type Logger struct {
 	IgnoreRecordNotFoundError bool
 }
 
-func LoggerWrap(xLogger *zap.Logger) *Logger {
+func GormWrapLogger(xLogger *zap.Logger) *Logger {
 	var logLevel gormlogger.LogLevel
 	switch xLogger.Level() {
 	case zap.DebugLevel:
@@ -33,6 +33,15 @@ func LoggerWrap(xLogger *zap.Logger) *Logger {
 	return &Logger{
 		xLogger:                   xLogger,
 		LogLevel:                  logLevel,
+		SlowThreshold:             200 * time.Millisecond,
+		IgnoreRecordNotFoundError: true,
+	}
+}
+
+func GormSilentLogger(xLogger *zap.Logger) *Logger {
+	return &Logger{
+		xLogger:                   xLogger,
+		LogLevel:                  gormlogger.Silent,
 		SlowThreshold:             200 * time.Millisecond,
 		IgnoreRecordNotFoundError: true,
 	}

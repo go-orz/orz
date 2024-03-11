@@ -2,17 +2,27 @@ package database
 
 import (
 	"github.com/go-orz/orz/config"
+	"github.com/go-orz/orz/log"
+	"github.com/go-orz/orz/z"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func MustConnectDatabase(cfg config.Database) (db *gorm.DB) {
+	var wrapLogger logger.Interface
+	if cfg.ShowSql {
+		wrapLogger = z.GormWrapLogger(log.Z())
+	} else {
+		wrapLogger = z.GormSilentLogger(log.Z())
+	}
+
 	switch cfg.Type {
 	case "mysql":
-		return MustConnectMysql(cfg.Mysql)
+		return MustConnectMysql(cfg.Mysql, wrapLogger)
 	case "clickhouse":
-		return MustConnectClickHouse(cfg.ClickHouse)
+		return MustConnectClickHouse(cfg.ClickHouse, wrapLogger)
 	case "sqlite":
-		return MustConnectSqlite(cfg.Sqlite)
+		return MustConnectSqlite(cfg.Sqlite, wrapLogger)
 	default:
 		panic(`Unknown database type: ` + cfg.Type)
 	}

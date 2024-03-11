@@ -3,8 +3,8 @@ package config
 import (
 	_ "embed"
 	"encoding/json"
-	"github.com/labstack/echo/v4"
 	"github.com/spf13/viper"
+	"strings"
 	"time"
 )
 
@@ -12,9 +12,9 @@ var (
 	instance *Config
 )
 
-type CustomConfig map[string]any
+type AppConfig map[string]any
 
-func (r CustomConfig) MustUnmarshal(v any) {
+func (r AppConfig) MustUnmarshal(v any) {
 	data, err := json.Marshal(r)
 	if err != nil {
 		panic(err)
@@ -26,15 +26,14 @@ func (r CustomConfig) MustUnmarshal(v any) {
 }
 
 type Config struct {
-	Log      Log      // 日志
-	Database Database // 数据库配置
-	Server   Server   // Web 服务器配置
-	Custom   CustomConfig
+	Log      Log       // 日志
+	Database Database  // 数据库配置
+	Server   Server    // Web 服务器配置
+	App      AppConfig // 应用程序个性化配置
 }
 
 type Server struct {
-	Port        int
-	Host        string
+	Addr        string
 	TLS         TLS
 	IPExtractor string
 }
@@ -57,6 +56,7 @@ type Database struct {
 	Mysql      MysqlCfg
 	ClickHouse ClickHouseConfig
 	Sqlite     SqliteConfig
+	ShowSql    bool
 }
 
 type MysqlCfg struct {
@@ -92,6 +92,7 @@ func MustInit(config string) {
 		config = "config.yaml"
 	}
 	viper.SetConfigFile(config)
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	if err := viper.ReadInConfig(); err != nil {
 		panic(`read config err: ` + err.Error())
 	} else {
@@ -107,17 +108,4 @@ func Conf() *Config {
 		panic(`you must call config.MustInit(config string) first`)
 	}
 	return instance
-}
-
-func IPExtractor() echo.IPExtractor {
-	switch Conf().Server.IPExtractor {
-	case "direct":
-		return echo.ExtractIPDirect()
-	case "x-real-ip":
-		return echo.ExtractIPFromRealIPHeader()
-	case "x-forwarded-for":
-		return echo.ExtractIPFromXFFHeader()
-	default:
-		return echo.ExtractIPDirect()
-	}
 }

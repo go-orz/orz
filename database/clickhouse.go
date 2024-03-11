@@ -3,13 +3,12 @@ package database
 import (
 	"fmt"
 	"github.com/go-orz/orz/config"
-	"github.com/go-orz/orz/log"
-	"github.com/go-orz/orz/z"
 	"gorm.io/driver/clickhouse"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
-func MustConnectClickHouse(cfg config.ClickHouseConfig) (db *gorm.DB) {
+func MustConnectClickHouse(cfg config.ClickHouseConfig, logger logger.Interface) (db *gorm.DB) {
 	dsn := fmt.Sprintf("clickhouse://%s:%s@%s:%d/%s?dial_timeout=10s&read_timeout=20s",
 		cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.Database,
 	)
@@ -25,7 +24,7 @@ func MustConnectClickHouse(cfg config.ClickHouseConfig) (db *gorm.DB) {
 		DefaultIndexType:             "minmax", // index stores extremes of the expression
 		DefaultTableEngineOpts:       "ENGINE=MergeTree() ORDER BY tuple()",
 	}), &gorm.Config{
-		Logger:                 z.LoggerWrap(log.Z()),
+		Logger:                 logger,
 		SkipDefaultTransaction: false,
 	})
 	if err != nil {

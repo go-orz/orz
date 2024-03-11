@@ -101,8 +101,8 @@ func (r *Repo[T, ID]) FindByIdForUpdateNowait(ctx context.Context, id ID) (m T, 
 	return m, true, err
 }
 
-func (r *Repo[T, ID]) FindByIdIn(c context.Context, assetIds []ID) (o []T, err error) {
-	err = r.GetDB(c).Where("id in ?", assetIds).Find(&o).Error
+func (r *Repo[T, ID]) FindByIdIn(c context.Context, ids []ID) (o []T, err error) {
+	err = r.GetDB(c).Where("id in ?", ids).Find(&o).Error
 	return
 }
 
