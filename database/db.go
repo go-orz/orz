@@ -13,7 +13,7 @@ func MustConnectDatabase(cfg config.Database) (db *gorm.DB) {
 	if cfg.ShowSql {
 		wrapLogger = z.GormWrapLogger(log.Z())
 	} else {
-		wrapLogger = z.GormSilentLogger(log.Z())
+		wrapLogger = z.GormErrorLogger(log.Z())
 	}
 
 	switch cfg.Type {
@@ -23,6 +23,8 @@ func MustConnectDatabase(cfg config.Database) (db *gorm.DB) {
 		return MustConnectClickHouse(cfg.ClickHouse, wrapLogger)
 	case "sqlite":
 		return MustConnectSqlite(cfg.Sqlite, wrapLogger)
+	case "postgresql":
+		return MustConnectPostgresql(cfg.Postgresql, wrapLogger)
 	default:
 		panic(`Unknown database type: ` + cfg.Type)
 	}

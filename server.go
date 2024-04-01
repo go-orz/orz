@@ -19,7 +19,7 @@ type Server interface {
 func NewServer(cfg config.Server, logger *zap.Logger) Server {
 
 	e := echo.New()
-	e.IPExtractor = x.IPExtractor()
+	e.IPExtractor = x.IPExtractor(logger)
 
 	return &server{
 		e:      e,

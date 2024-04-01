@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/spf13/cast"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"slices"
+	"strings"
 )
 
 type SortDirection string
@@ -107,6 +110,8 @@ const (
 	MatcherNotContains MatcherMode = "not-contains"
 	MatcherNotEqual    MatcherMode = "not-equal"
 	MatcherNotIn       MatcherMode = "not-in"
+
+	MatcherTags MatcherMode = "tags"
 )
 
 var Empty = struct{}{}
@@ -130,7 +135,7 @@ func (r Matcher) SnakeName() string {
 }
 
 func (r *Repo[T, ID]) wrap(property string) string {
-	return fmt.Sprintf("%s.`%s`", r.GetTableName(), property)
+	return fmt.Sprintf("%s.%s", r.GetTableName(), property)
 }
 
 func (r *Repo[T, ID]) Page(ctx context.Context, pageRequest *PageRequest) (page *PageResult[T], err error) {
@@ -166,6 +171,11 @@ func (r *Repo[T, ID]) Page(ctx context.Context, pageRequest *PageRequest) (page 
 			db = db.Where(fmt.Sprintf("%s != ?", r.wrap(matcher.SnakeName())), matcher.Value)
 		case MatcherNotIn:
 			db = db.Where(fmt.Sprintf("%s not in ?", r.wrap(matcher.SnakeName())), matcher.Value)
+		case MatcherTags:
+			tags := strings.Split(cast.ToString(matcher.Value), ",")
+			for _, tag := range tags {
+				db = db.Where(datatypes.JSONArrayQuery(matcher.SnakeName()).Contains(tag))
+			}
 		}
 	}
 

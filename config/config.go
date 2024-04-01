@@ -36,6 +36,7 @@ type Server struct {
 	Addr        string
 	TLS         TLS
 	IPExtractor string
+	IPTrustList []string // 信任的IP
 }
 
 type TLS struct {
@@ -56,6 +57,7 @@ type Database struct {
 	Mysql      MysqlCfg
 	ClickHouse ClickHouseConfig
 	Sqlite     SqliteConfig
+	Postgresql PostgresqlCfg
 	ShowSql    bool
 }
 
@@ -68,6 +70,14 @@ type MysqlCfg struct {
 	MaxIdleConns    int           `yaml:"max-idle-conns"`
 	MaxOpenConns    int           `yaml:"max-open-conns"`
 	ConnMaxLifetime time.Duration `yaml:"conn-max-lifetime"`
+}
+
+type PostgresqlCfg struct {
+	Hostname string `yaml:"hostname"`
+	Port     int    `yaml:"port"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	Database string `yaml:"database"`
 }
 
 type ClickHouseConfig struct {

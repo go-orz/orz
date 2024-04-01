@@ -38,10 +38,10 @@ func GormWrapLogger(xLogger *zap.Logger) *Logger {
 	}
 }
 
-func GormSilentLogger(xLogger *zap.Logger) *Logger {
+func GormErrorLogger(xLogger *zap.Logger) *Logger {
 	return &Logger{
 		xLogger:                   xLogger,
-		LogLevel:                  gormlogger.Silent,
+		LogLevel:                  gormlogger.Error,
 		SlowThreshold:             200 * time.Millisecond,
 		IgnoreRecordNotFoundError: true,
 	}

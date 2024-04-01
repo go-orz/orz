@@ -63,7 +63,7 @@ func GenPassword() string {
 	return string(buf)
 }
 
-const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 const onlyNumber = "0123456789"
 
 func GenRandomStr(n int) (randStr string) {
