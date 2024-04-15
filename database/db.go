@@ -17,13 +17,13 @@ func MustConnectDatabase(cfg config.Database) (db *gorm.DB) {
 	}
 
 	switch cfg.Type {
-	case "mysql":
+	case config.DatabaseMysql:
 		return MustConnectMysql(cfg.Mysql, wrapLogger)
-	case "clickhouse":
+	case config.DatabaseClickhouse:
 		return MustConnectClickHouse(cfg.ClickHouse, wrapLogger)
-	case "sqlite":
+	case config.DatabaseSqlite:
 		return MustConnectSqlite(cfg.Sqlite, wrapLogger)
-	case "postgresql":
+	case config.DatabasePostgres:
 		return MustConnectPostgresql(cfg.Postgresql, wrapLogger)
 	default:
 		panic(`Unknown database type: ` + cfg.Type)

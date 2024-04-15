@@ -13,6 +13,14 @@ var (
 )
 
 type AppConfig map[string]any
+type DatabaseType string
+
+const (
+	DatabaseSqlite     DatabaseType = "sqlite"
+	DatabaseMysql      DatabaseType = "mysql"
+	DatabasePostgres   DatabaseType = "postgres"
+	DatabaseClickhouse DatabaseType = "clickhouse"
+)
 
 func (r AppConfig) MustUnmarshal(v any) {
 	data, err := json.Marshal(r)
@@ -53,7 +61,7 @@ type Log struct {
 
 type Database struct {
 	Enabled    bool
-	Type       string
+	Type       DatabaseType
 	Mysql      MysqlCfg
 	ClickHouse ClickHouseConfig
 	Sqlite     SqliteConfig
