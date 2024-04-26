@@ -65,7 +65,7 @@ type Database struct {
 	Mysql      MysqlCfg
 	ClickHouse ClickHouseConfig
 	Sqlite     SqliteConfig
-	Postgresql PostgresqlCfg
+	Postgres   PostgresCfg
 	ShowSql    bool
 }
 
@@ -80,7 +80,7 @@ type MysqlCfg struct {
 	ConnMaxLifetime time.Duration `yaml:"conn-max-lifetime"`
 }
 
-type PostgresqlCfg struct {
+type PostgresCfg struct {
 	Hostname string `yaml:"hostname"`
 	Port     int    `yaml:"port"`
 	Username string `yaml:"username"`

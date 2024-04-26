@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func MustConnectPostgresql(cfg config.PostgresqlCfg, logger logger.Interface) (db *gorm.DB) {
+func MustConnectPostgresql(cfg config.PostgresCfg, logger logger.Interface) (db *gorm.DB) {
 	var err error
 	dsn := fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s sslmode=disable TimeZone=Asia/Shanghai",
 		cfg.Username,
