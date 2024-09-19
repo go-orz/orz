@@ -33,17 +33,17 @@ func (e *Error) Unwrap() error {
 	return e.Wrapped
 }
 
-func New(code ErrorCode, message string) *Error {
+func NewError(code ErrorCode, message string) *Error {
 	return &Error{
 		Code:    code,
 		Message: message,
 	}
 }
 
-func From(err error) *Error {
+func ErrorFrom(err error) *Error {
 	var e *Error
 	if errors.As(err, &e) {
 		return e
 	}
-	return New(ErrorCode(http.StatusInternalServerError), err.Error())
+	return NewError(ErrorCode(http.StatusInternalServerError), err.Error())
 }

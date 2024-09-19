@@ -1,55 +1,83 @@
 package orz
 
 import (
-	"bytes"
-	"fmt"
-	"sync"
-	"time"
-	"unicode"
+	"context"
+	"errors"
+	"github.com/go-orz/orz/config"
+	"github.com/go-orz/orz/database"
+	"github.com/go-orz/orz/log"
+	"github.com/go-orz/orz/x"
+	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
+	"net/http"
+	"os"
+	"os/signal"
 )
 
-func Maybe[T any](cond bool, t, f T) T {
-	if cond {
-		return t
+func New(configPath string) *Orz {
+	// 初始化配置
+	config.MustInit(configPath)
+	conf := config.Conf()
+	// 初始化日志
+	InjectLogger(log.Z())
+
+	// 初始化数据库
+	if conf.Database.Enabled {
+		db := database.MustConnectDatabase(conf.Database)
+		InjectDB(db)
 	}
-	return f
+	// 初始化web服务器
+	e := echo.New()
+	e.IPExtractor = x.IPExtractor(log.Z())
+
+	log.Z().Debug("config", zap.Any("conf", conf))
+	return &Orz{
+		Config:   conf,
+		Database: _db,
+		Logger:   log.Z(),
+	}
 }
 
-func CamelToSnake(s string) string {
-	var buf bytes.Buffer
-	for i, r := range s {
-		if unicode.IsUpper(r) {
-			if i > 0 {
-				buf.WriteByte('_')
+type Orz struct {
+	Config   *config.Config
+	Database *gorm.DB
+	Logger   *zap.Logger
+	echo     *echo.Echo
+}
+
+func (r *Orz) Start() {
+	go func() {
+		e := r.echo
+		cfg := r.Config.Server
+
+		addr := cfg.Addr
+		logger := r.Logger
+		logger.Sugar().Infof("http server start at: %v", addr)
+
+		var err error
+		if cfg.TLS.Enabled {
+			if cfg.TLS.Auto {
+				err = e.StartAutoTLS(addr)
+			} else {
+				err = e.StartTLS(addr, cfg.TLS.Cert, cfg.TLS.Key)
 			}
-			buf.WriteRune(unicode.ToLower(r))
 		} else {
-			buf.WriteRune(r)
+			err = e.Start(addr)
 		}
-	}
-	return buf.String()
-}
 
-// Debounce 防抖函数：该函数会从上一次被调用后，延迟 wait 毫秒后调用 func 方法。
-func Debounce(wait time.Duration) func(f func()) {
-	var lock sync.Mutex
-	var timer *time.Timer
-
-	return func(f func()) {
-		lock.Lock()
-		defer lock.Unlock()
-
-		if timer != nil {
-			timer.Stop()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Sugar().Errorf("shutting down server err: %v", err)
 		}
-		timer = time.AfterFunc(wait, f)
-	}
-}
-
-func TimeWatch(name string) {
-	start := time.Now()
-	defer func() {
-		cost := time.Since(start)
-		fmt.Printf("%s: %v\n", name, cost)
 	}()
+}
+
+func (r *Orz) Wait() {
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
+}
+
+func (r *Orz) Stop(ctx context.Context) error {
+	return r.echo.Shutdown(ctx)
 }
