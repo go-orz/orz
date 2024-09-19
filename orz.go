@@ -36,6 +36,7 @@ func New(configPath string) *Orz {
 		Config:   conf,
 		Database: _db,
 		Logger:   log.Z(),
+		echo:     e,
 	}
 }
 
@@ -80,4 +81,8 @@ func (r *Orz) Wait() {
 
 func (r *Orz) Stop(ctx context.Context) error {
 	return r.echo.Shutdown(ctx)
+}
+
+func (r *Orz) Echo() *echo.Echo {
+	return r.echo
 }
