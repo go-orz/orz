@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
+
+	"github.com/go-orz/orz/config"
 	"github.com/spf13/cast"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
-	"slices"
-	"strings"
 )
 
 type SortDirection string
@@ -103,13 +105,15 @@ type PageResult[T any] struct {
 type MatcherMode string
 
 const (
-	MatcherContains MatcherMode = "contains"
-	MatcherEqual    MatcherMode = "equal"
-	MatcherIn       MatcherMode = "in"
+	MatcherContains           MatcherMode = "contains"             // 模糊查询
+	MatcherContainsIgnoreCase MatcherMode = "contains-ignore-case" // 模糊查询忽略大小写
+	MatcherEqual              MatcherMode = "equal"                // = 比较
+	MatcherIn                 MatcherMode = "in"                   // in 查询
 
-	MatcherNotContains MatcherMode = "not-contains"
-	MatcherNotEqual    MatcherMode = "not-equal"
-	MatcherNotIn       MatcherMode = "not-in"
+	MatcherNotContains           MatcherMode = "not-contains"
+	MatcherNotContainsIgnoreCase MatcherMode = "not-contains-ignore-case"
+	MatcherNotEqual              MatcherMode = "not-equal"
+	MatcherNotIn                 MatcherMode = "not-in"
 
 	MatcherTags MatcherMode = "tags"
 )
@@ -125,17 +129,29 @@ func NewMatcher(name string, value any, mode MatcherMode) Matcher {
 }
 
 type Matcher struct {
-	Name  string
-	Value any
-	Mode  MatcherMode
+	Name        string
+	Value       any
+	Mode        MatcherMode
+	CustomTable bool // 自定义表
 }
 
-func (r Matcher) SnakeName() string {
+func (r *Matcher) SnakeName() string {
 	return CamelToSnake(r.Name)
 }
 
 func (r *Repo[T, ID]) wrap(property string) string {
 	return fmt.Sprintf("%s.%s", r.GetTableName(), property)
+}
+
+func (r *Repo[T, ID]) wrapQuery(m Matcher) string {
+	if m.CustomTable {
+		return m.SnakeName()
+	}
+	return fmt.Sprintf("%s.%s", r.GetTableName(), m.SnakeName())
+}
+
+func (r *Repo[T, ID]) likeValue(v any) string {
+	return "%" + cast.ToString(v) + "%"
 }
 
 func (r *Repo[T, ID]) Page(ctx context.Context, pageRequest *PageRequest) (page *PageResult[T], err error) {
@@ -149,34 +165,9 @@ func (r *Repo[T, ID]) Page(ctx context.Context, pageRequest *PageRequest) (page 
 		db = pageRequest.Modifier(db)
 	}
 
-	for _, matcher := range pageRequest.Matchers {
-		if matcher.Value == Empty {
-			matcher.Value = ""
-		} else {
-			if matcher.Name == "" || matcher.Value == "" {
-				continue
-			}
-		}
-
-		switch matcher.Mode {
-		case MatcherContains:
-			db = db.Where(fmt.Sprintf("%s like ?", r.wrap(matcher.SnakeName())), "%"+fmt.Sprintf("%v", matcher.Value)+"%")
-		case MatcherEqual:
-			db = db.Where(fmt.Sprintf("%s = ?", r.wrap(matcher.SnakeName())), matcher.Value)
-		case MatcherIn:
-			db = db.Where(fmt.Sprintf("%s in ?", r.wrap(matcher.SnakeName())), matcher.Value)
-		case MatcherNotContains:
-			db = db.Where(fmt.Sprintf("%s not like ?", r.wrap(matcher.SnakeName())), "%"+fmt.Sprintf("%v", matcher.Value)+"%")
-		case MatcherNotEqual:
-			db = db.Where(fmt.Sprintf("%s != ?", r.wrap(matcher.SnakeName())), matcher.Value)
-		case MatcherNotIn:
-			db = db.Where(fmt.Sprintf("%s not in ?", r.wrap(matcher.SnakeName())), matcher.Value)
-		case MatcherTags:
-			tags := strings.Split(cast.ToString(matcher.Value), ",")
-			for _, tag := range tags {
-				db = db.Where(datatypes.JSONArrayQuery(matcher.SnakeName()).Contains(tag))
-			}
-		}
+	db, err = r.match(db, pageRequest.Matchers)
+	if err != nil {
+		return nil, err
 	}
 
 	sort := pageRequest.Sort
@@ -196,4 +187,78 @@ func (r *Repo[T, ID]) Page(ctx context.Context, pageRequest *PageRequest) (page 
 		err = db.Find(&(page.Items)).Error
 	}
 	return
+}
+
+func (r *Repo[T, ID]) Find(ctx context.Context, matchers []Matcher, sort Sort) (items []T, err error) {
+	db := r.GetDB(ctx)
+
+	db, err = r.match(db, matchers)
+	if err != nil {
+		return nil, err
+	}
+
+	if sort.Property() != "" {
+		db = db.Order(fmt.Sprintf(`%s %s`, r.wrap(sort.Property()), sort.Direction()))
+	}
+
+	err = db.Table(r.GetTableName()).Find(&items).Error
+	return items, err
+}
+
+func (r *Repo[T, ID]) match(db *gorm.DB, matchers []Matcher) (*gorm.DB, error) {
+	databaseType := config.Conf().Database.Type
+	for _, matcher := range matchers {
+		if matcher.Value == Empty {
+			matcher.Value = ""
+		} else {
+			if matcher.Name == "" || matcher.Value == "" {
+				continue
+			}
+		}
+
+		switch matcher.Mode {
+		case MatcherContains:
+			db = db.Where(fmt.Sprintf("%s like ?", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
+		case MatcherContainsIgnoreCase:
+			switch databaseType {
+			case config.DatabaseMysql:
+				// 转大写之后再比较
+				db = db.Where(fmt.Sprintf("LOWER(%s) like LOWER(?)", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
+			case config.DatabaseSqlite:
+				db = db.Where(fmt.Sprintf("%s like ?", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
+			case config.DatabasePostgres:
+				db = db.Where(fmt.Sprintf("%s ILIKE ?", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
+			case config.DatabaseClickhouse:
+				return nil, errors.New("not supported yet")
+			}
+		case MatcherEqual:
+			db = db.Where(fmt.Sprintf("%s = ?", r.wrapQuery(matcher)), matcher.Value)
+		case MatcherIn:
+			db = db.Where(fmt.Sprintf("%s in ?", r.wrapQuery(matcher)), matcher.Value)
+		case MatcherNotContains:
+			db = db.Where(fmt.Sprintf("%s not like ?", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
+		case MatcherNotContainsIgnoreCase:
+			switch databaseType {
+			case config.DatabaseMysql:
+				// 转大写之后再比较
+				db = db.Where(fmt.Sprintf("LOWER(%s) not like LOWER(?)", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
+			case config.DatabaseSqlite:
+				db = db.Where(fmt.Sprintf("%s not like ?", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
+			case config.DatabasePostgres:
+				db = db.Where(fmt.Sprintf("%s not ILIKE ?", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
+			case config.DatabaseClickhouse:
+				return nil, errors.New("not supported yet")
+			}
+		case MatcherNotEqual:
+			db = db.Where(fmt.Sprintf("%s != ?", r.wrapQuery(matcher)), matcher.Value)
+		case MatcherNotIn:
+			db = db.Where(fmt.Sprintf("%s not in ?", r.wrapQuery(matcher)), matcher.Value)
+		case MatcherTags:
+			tags := strings.Split(cast.ToString(matcher.Value), ",")
+			for _, tag := range tags {
+				db = db.Where(datatypes.JSONArrayQuery(matcher.SnakeName()).Contains(tag))
+			}
+		}
+	}
+	return db, nil
 }

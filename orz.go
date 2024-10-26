@@ -29,9 +29,8 @@ func New(configPath string) *Orz {
 	}
 	// 初始化web服务器
 	e := echo.New()
-	e.IPExtractor = x.IPExtractor(log.Z())
+	e.IPExtractor = x.IPExtractor()
 
-	log.Z().Debug("config", zap.Any("conf", conf))
 	return &Orz{
 		Config:   conf,
 		Database: _db,
