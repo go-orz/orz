@@ -2,11 +2,11 @@ package orz
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
 
+	"github.com/go-errors/errors"
 	"github.com/go-orz/orz/config"
 	"github.com/spf13/cast"
 	"gorm.io/datatypes"

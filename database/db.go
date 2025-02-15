@@ -3,7 +3,6 @@ package database
 import (
 	"github.com/go-orz/orz/config"
 	"github.com/go-orz/orz/log"
-	"github.com/go-orz/orz/z"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -11,9 +10,9 @@ import (
 func MustConnectDatabase(cfg config.Database) (db *gorm.DB) {
 	var wrapLogger logger.Interface
 	if cfg.ShowSql {
-		wrapLogger = z.GormWrapLogger(log.Z())
+		wrapLogger = GormWrapLogger(log.Z())
 	} else {
-		wrapLogger = z.GormErrorLogger(log.Z())
+		wrapLogger = GormErrorLogger(log.Z())
 	}
 
 	switch cfg.Type {

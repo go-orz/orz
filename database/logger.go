@@ -1,12 +1,12 @@
-package z
+package database
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"go.uber.org/zap"
 	"time"
 
+	"github.com/go-errors/errors"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )

@@ -1,8 +1,9 @@
 package orz
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/go-errors/errors"
 )
 
 type PanicErr struct {

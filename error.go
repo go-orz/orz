@@ -2,8 +2,9 @@ package orz
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"net/http"
+
+	"github.com/go-errors/errors"
 )
 
 type ErrorCode int

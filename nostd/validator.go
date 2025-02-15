@@ -1,6 +1,7 @@
 package nostd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -35,7 +36,8 @@ func (cv *CustomValidator) TransInit() error {
 
 func (cv *CustomValidator) Validate(i interface{}) error {
 	if err := cv.Validator.Struct(i); err != nil {
-		errs, ok := err.(validator.ValidationErrors)
+		var errs validator.ValidationErrors
+		ok := errors.As(err, &errs)
 		if !ok {
 			return err
 		}

@@ -4,6 +4,7 @@ go 1.22.0
 
 require (
 	github.com/glebarez/sqlite v1.11.0
+	github.com/go-errors/errors v1.5.1
 	github.com/go-playground/locales v0.14.1
 	github.com/go-playground/universal-translator v0.18.1
 	github.com/go-playground/validator/v10 v10.22.1

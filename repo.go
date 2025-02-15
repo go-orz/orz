@@ -2,10 +2,10 @@ package orz
 
 import (
 	"context"
-	"errors"
-	"gorm.io/gorm"
 	"reflect"
 
+	"github.com/go-errors/errors"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -63,11 +63,15 @@ func (r *Repo[T, ID]) ExistsById(ctx context.Context, id ID) (exists bool, err e
 func (r *Repo[T, ID]) FindById(ctx context.Context, id ID) (m T, err error) {
 	db := r.GetDB(ctx)
 	err = db.Table(r.GetTableName()).Where("id = ?", id).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return m, errors.Errorf("record %v not found", id)
+	}
 	return m, err
 }
 
 func (r *Repo[T, ID]) FindByIdExists(ctx context.Context, id ID) (m T, exists bool, err error) {
-	m, err = r.FindById(ctx, id)
+	db := r.GetDB(ctx)
+	err = db.Table(r.GetTableName()).Where("id = ?", id).First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return m, false, nil
 	}

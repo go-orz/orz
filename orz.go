@@ -2,17 +2,18 @@ package orz
 
 import (
 	"context"
-	"errors"
-	"github.com/go-orz/orz/config"
-	"github.com/go-orz/orz/database"
-	"github.com/go-orz/orz/log"
-	"github.com/go-orz/orz/x"
-	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
-	"gorm.io/gorm"
 	"net/http"
 	"os"
 	"os/signal"
+
+	"github.com/go-errors/errors"
+	"github.com/go-orz/orz/config"
+	"github.com/go-orz/orz/database"
+	"github.com/go-orz/orz/log"
+
+	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 func New(configPath string) *Orz {
@@ -29,7 +30,6 @@ func New(configPath string) *Orz {
 	}
 	// 初始化web服务器
 	e := echo.New()
-	e.IPExtractor = x.IPExtractor()
 
 	return &Orz{
 		Config:   conf,

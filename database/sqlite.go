@@ -3,7 +3,7 @@ package database
 import (
 	"fmt"
 	"github.com/go-orz/orz/config"
-	"github.com/go-orz/orz/z"
+	"github.com/go-orz/orz/utils"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"path/filepath"
@@ -13,7 +13,7 @@ import (
 
 func MustConnectSqlite(cfg config.SqliteConfig, logger logger.Interface) (db *gorm.DB) {
 	dir := filepath.Dir(cfg.Path)
-	if err := z.MkdirIfNotExists(dir); err != nil {
+	if err := utils.MkdirIfNotExists(dir); err != nil {
 		panic(fmt.Sprintf("couldn't create sqlite db dir: %v", err))
 	}
 	var err error
