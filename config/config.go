@@ -19,6 +19,7 @@ const (
 	DatabaseSqlite     DatabaseType = "sqlite"
 	DatabaseMysql      DatabaseType = "mysql"
 	DatabasePostgres   DatabaseType = "postgres"
+	DatabasePostgresql DatabaseType = "postgresql"
 	DatabaseClickhouse DatabaseType = "clickhouse"
 )
 
@@ -70,6 +71,7 @@ type Database struct {
 }
 
 type MysqlCfg struct {
+	DSN             string        `yaml:"dsn"`
 	Hostname        string        `yaml:"hostname"`
 	Port            int           `yaml:"port"`
 	Username        string        `yaml:"username"`
@@ -81,6 +83,7 @@ type MysqlCfg struct {
 }
 
 type PostgresCfg struct {
+	DSN      string `yaml:"dsn"`
 	Hostname string `yaml:"hostname"`
 	Port     int    `yaml:"port"`
 	Username string `yaml:"username"`

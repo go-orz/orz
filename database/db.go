@@ -22,7 +22,7 @@ func MustConnectDatabase(cfg config.Database) (db *gorm.DB) {
 		return MustConnectClickHouse(cfg.ClickHouse, wrapLogger)
 	case config.DatabaseSqlite:
 		return MustConnectSqlite(cfg.Sqlite, wrapLogger)
-	case config.DatabasePostgres:
+	case config.DatabasePostgres, config.DatabasePostgresql:
 		return MustConnectPostgresql(cfg.Postgres, wrapLogger)
 	default:
 		panic(`Unknown database type: ` + cfg.Type)

@@ -226,7 +226,7 @@ func (r *Repo[T, ID]) match(db *gorm.DB, matchers []Matcher) (*gorm.DB, error) {
 				db = db.Where(fmt.Sprintf("LOWER(%s) like LOWER(?)", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
 			case config.DatabaseSqlite:
 				db = db.Where(fmt.Sprintf("%s like ?", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
-			case config.DatabasePostgres:
+			case config.DatabasePostgres, config.DatabasePostgresql:
 				db = db.Where(fmt.Sprintf("%s ILIKE ?", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
 			case config.DatabaseClickhouse:
 				return nil, errors.New("not supported yet")
@@ -244,7 +244,7 @@ func (r *Repo[T, ID]) match(db *gorm.DB, matchers []Matcher) (*gorm.DB, error) {
 				db = db.Where(fmt.Sprintf("LOWER(%s) not like LOWER(?)", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
 			case config.DatabaseSqlite:
 				db = db.Where(fmt.Sprintf("%s not like ?", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
-			case config.DatabasePostgres:
+			case config.DatabasePostgres, config.DatabasePostgresql:
 				db = db.Where(fmt.Sprintf("%s not ILIKE ?", r.wrapQuery(matcher)), r.likeValue(matcher.Value))
 			case config.DatabaseClickhouse:
 				return nil, errors.New("not supported yet")

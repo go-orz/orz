@@ -10,14 +10,17 @@ import (
 
 func MustConnectPostgresql(cfg config.PostgresCfg, logger logger.Interface) (db *gorm.DB) {
 	var err error
-	dsn := fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s sslmode=disable TimeZone=Asia/Shanghai",
-		cfg.Username,
-		cfg.Password,
-		cfg.Hostname,
-		cfg.Port,
-		cfg.Database,
-	)
-	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+	if cfg.DSN == "" {
+		cfg.DSN = fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s sslmode=disable",
+			cfg.Username,
+			cfg.Password,
+			cfg.Hostname,
+			cfg.Port,
+			cfg.Database,
+		)
+	}
+
+	db, err = gorm.Open(postgres.Open(cfg.DSN), &gorm.Config{
 		Logger: logger,
 	})
 	if err != nil {

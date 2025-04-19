@@ -10,14 +10,17 @@ import (
 
 func MustConnectMysql(cfg config.MysqlCfg, logger logger.Interface) (db *gorm.DB) {
 	var err error
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=60s",
-		cfg.Username,
-		cfg.Password,
-		cfg.Hostname,
-		cfg.Port,
-		cfg.Database,
-	)
-	db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
+	if cfg.DSN == "" {
+		cfg.DSN = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=60s",
+			cfg.Username,
+			cfg.Password,
+			cfg.Hostname,
+			cfg.Port,
+			cfg.Database,
+		)
+	}
+
+	db, err = gorm.Open(mysql.Open(cfg.DSN), &gorm.Config{
 		Logger: logger,
 	})
 	if err != nil {
