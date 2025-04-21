@@ -54,3 +54,9 @@ func (m *SafeMap[K, V]) Values() iter.Seq[V] {
 	defer m.mu.RUnlock()
 	return maps.Values(m.m)
 }
+
+func (m *SafeMap[K, V]) Len() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.m)
+}
