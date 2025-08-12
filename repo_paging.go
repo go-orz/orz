@@ -3,6 +3,7 @@ package orz
 import (
 	"context"
 	"fmt"
+	"gorm.io/gorm/clause"
 	"slices"
 	"strings"
 
@@ -75,13 +76,14 @@ func NewPageRequest(pageIndex, pageSize int, sort Sort, matchers []Matcher) Page
 }
 
 type PageRequest struct {
-	PageIndex int
-	PageSize  int
-	Sort      Sort
-	Matchers  []Matcher
-	Modifier  func(db *gorm.DB) *gorm.DB
-	result    any
-	result1   bool
+	PageIndex      int
+	PageSize       int
+	Sort           Sort
+	Matchers       []Matcher
+	KeywordMatcher *KeywordMatcher
+	Modifier       func(db *gorm.DB) *gorm.DB
+	result         any
+	result1        bool
 }
 
 func (r *PageRequest) Result(result any) {
@@ -139,6 +141,20 @@ func (r *Matcher) SnakeName() string {
 	return CamelToSnake(r.Name)
 }
 
+func NewKeywordMatcher(names []string, value any) *KeywordMatcher {
+	return &KeywordMatcher{
+		Names:       names,
+		Value:       value,
+		CustomTable: false,
+	}
+}
+
+type KeywordMatcher struct {
+	Names       []string
+	Value       any
+	CustomTable bool // 自定义表
+}
+
 func (r *Repo[T, ID]) wrap(property string) string {
 	return fmt.Sprintf("%s.%s", r.GetTableName(), property)
 }
@@ -166,6 +182,10 @@ func (r *Repo[T, ID]) Page(ctx context.Context, pageRequest *PageRequest) (page 
 	}
 
 	db, err = r.match(db, pageRequest.Matchers)
+	if err != nil {
+		return nil, err
+	}
+	db, err = r.keywordMatch(db, pageRequest.KeywordMatcher)
 	if err != nil {
 		return nil, err
 	}
@@ -259,6 +279,64 @@ func (r *Repo[T, ID]) match(db *gorm.DB, matchers []Matcher) (*gorm.DB, error) {
 				db = db.Where(datatypes.JSONArrayQuery(matcher.SnakeName()).Contains(tag))
 			}
 		}
+	}
+	return db, nil
+}
+
+func (r *Repo[T, ID]) keywordMatch(db *gorm.DB, matcher *KeywordMatcher) (*gorm.DB, error) {
+	if matcher == nil {
+		return db, nil
+	}
+	if matcher.Value == Empty || cast.ToString(matcher.Value) == "" {
+		return db, nil
+	}
+
+	databaseType := config.Conf().Database.Type
+	switch databaseType {
+	case config.DatabaseMysql:
+		var exprList = make([]clause.Expression, 0, len(matcher.Names))
+		for _, name := range matcher.Names {
+			var field string
+			if matcher.CustomTable {
+				field = CamelToSnake(name)
+			} else {
+				field = fmt.Sprintf("%s.%s", r.GetTableName(), CamelToSnake(name))
+			}
+			exprList = append(exprList, gorm.Expr(fmt.Sprintf("LOWER(%s) like LOWER(?)", field), r.likeValue(matcher.Value)))
+		}
+		db = db.Clauses(clause.OrConditions{
+			Exprs: exprList,
+		})
+	case config.DatabaseSqlite:
+		var exprList = make([]clause.Expression, 0, len(matcher.Names))
+		for _, name := range matcher.Names {
+			var field string
+			if matcher.CustomTable {
+				field = CamelToSnake(name)
+			} else {
+				field = fmt.Sprintf("%s.%s", r.GetTableName(), CamelToSnake(name))
+			}
+			exprList = append(exprList, gorm.Expr(fmt.Sprintf("%s like?", field), r.likeValue(matcher.Value)))
+		}
+		db = db.Clauses(clause.OrConditions{
+			Exprs: exprList,
+		})
+	case config.DatabasePostgres, config.DatabasePostgresql:
+		var exprList = make([]clause.Expression, 0, len(matcher.Names))
+		for _, name := range matcher.Names {
+			var field string
+			if matcher.CustomTable {
+				field = CamelToSnake(name)
+			} else {
+				field = fmt.Sprintf("%s.%s", r.GetTableName(), CamelToSnake(name))
+			}
+			exprList = append(exprList, gorm.Expr(fmt.Sprintf("%s ILIKE ?", field), r.likeValue(matcher.Value)))
+		}
+		db = db.Clauses(clause.OrConditions{
+			Exprs: exprList,
+		})
+	case config.DatabaseClickhouse:
+		return nil, errors.New("not supported yet")
 	}
 	return db, nil
 }
