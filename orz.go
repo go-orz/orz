@@ -1,87 +1,193 @@
 package orz
 
 import (
-	"context"
-	"net/http"
-	"os"
-	"os/signal"
-
-	"github.com/go-errors/errors"
-	"github.com/go-orz/orz/config"
-	"github.com/go-orz/orz/database"
-	"github.com/go-orz/orz/log"
+	"fmt"
 
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
-func New(configPath string) *Orz {
-	// 初始化配置
-	config.MustInit(configPath)
-	conf := config.Conf()
-	// 初始化日志
-	InjectLogger(log.Z())
+type Map = map[string]any
 
-	// 初始化数据库
-	if conf.Database.Enabled {
-		db := database.MustConnectDatabase(conf.Database)
-		InjectDB(db)
-	}
-	// 初始化web服务器
-	e := echo.New()
+// Framework 框架结构
+type Framework struct {
+	app *App
+}
 
-	return &Orz{
-		Config:   conf,
-		Database: _db,
-		Logger:   log.Z(),
-		echo:     e,
+// Option 框架配置选项
+type Option func(*Framework) error
+
+// WithConfig 设置配置文件路径
+func WithConfig(configPath string) Option {
+	return func(f *Framework) error {
+		if err := f.app.LoadConfigFromFile(configPath); err != nil {
+			return fmt.Errorf("load config failed: %w", err)
+		}
+		return nil
 	}
 }
 
-type Orz struct {
-	Config   *config.Config
-	Database *gorm.DB
-	Logger   *zap.Logger
-	echo     *echo.Echo
+// WithConfigBytes 从字节数据设置配置
+func WithConfigBytes(data []byte) Option {
+	return func(f *Framework) error {
+		if err := f.app.LoadConfigFromBytes(data); err != nil {
+			return fmt.Errorf("load config from bytes failed: %w", err)
+		}
+		return nil
+	}
 }
 
-func (r *Orz) Start() {
-	go func() {
-		e := r.echo
-		cfg := r.Config.Server
+// WithConfigMap 从 map 设置配置
+func WithConfigMap(configMap map[string]interface{}) Option {
+	return func(f *Framework) error {
+		if err := f.app.LoadConfigFromMap(configMap); err != nil {
+			return fmt.Errorf("load config from map failed: %w", err)
+		}
+		return nil
+	}
+}
 
-		addr := cfg.Addr
-		logger := r.Logger
-		logger.Sugar().Infof("http server start at: %v", addr)
+// WithLogger 设置日志器
+func WithLogger(logger *zap.Logger) Option {
+	return func(f *Framework) error {
+		f.app.SetLogger(logger)
+		return nil
+	}
+}
 
-		var err error
-		if cfg.TLS.Enabled {
-			if cfg.TLS.Auto {
-				err = e.StartAutoTLS(addr)
-			} else {
-				err = e.StartTLS(addr, cfg.TLS.Cert, cfg.TLS.Key)
-			}
-		} else {
-			err = e.Start(addr)
+// WithLoggerFromConfig 根据配置启用日志器
+func WithLoggerFromConfig() Option {
+	return func(f *Framework) error {
+		if err := f.app.EnableLogger(); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+// WithDatabase 启用数据库
+func WithDatabase() Option {
+	return func(f *Framework) error {
+		if err := f.app.EnableDatabase(); err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+// WithHTTP 启用HTTP服务
+func WithHTTP() Option {
+	return func(f *Framework) error {
+		f.app.EnableHTTP()
+		return nil
+	}
+}
+
+// WithApplication 设置应用实现
+func WithApplication(application Application) Option {
+	return func(f *Framework) error {
+		if err := application.Configure(f.app); err != nil {
+			return fmt.Errorf("failed to configure application: %w", err)
+		}
+		return nil
+	}
+}
+
+// NewFramework 创建新的框架实例
+func NewFramework(options ...Option) (*Framework, error) {
+	framework := &Framework{
+		app: NewApp(),
+	}
+
+	// 应用所有选项
+	for _, option := range options {
+		if err := option(framework); err != nil {
+			return nil, err
+		}
+	}
+
+	return framework, nil
+}
+
+// Run 运行应用
+func (f *Framework) Run() error {
+	return f.app.Run()
+}
+
+// App 获取应用实例
+func (f *Framework) App() *App {
+	return f.app
+}
+
+// 便捷方法
+
+// GetDB 获取数据库实例
+func (f *Framework) GetDB() *gorm.DB {
+	db, err := f.app.GetDatabase()
+	if err != nil {
+		return nil
+	}
+	return db
+}
+
+// GetEcho 获取Echo实例
+func (f *Framework) GetEcho() *echo.Echo {
+	echo, err := f.app.GetEcho()
+	if err != nil {
+		return nil
+	}
+	return echo
+}
+
+// SimpleApp 简单应用实现
+type SimpleApp struct {
+	setupFn func(*echo.Echo, *gorm.DB) error
+}
+
+// NewSimpleApp 创建简单应用
+func NewSimpleApp(setupFn func(*echo.Echo, *gorm.DB) error) *SimpleApp {
+	return &SimpleApp{
+		setupFn: setupFn,
+	}
+}
+
+// Configure 配置应用
+func (s *SimpleApp) Configure(a *App) error {
+	// 执行自定义设置函数
+	if s.setupFn != nil {
+		var e *echo.Echo
+		var db *gorm.DB
+
+		if ee, err := a.GetEcho(); err == nil {
+			e = ee
+		}
+		if database, err := a.GetDatabase(); err == nil {
+			db = database
 		}
 
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Sugar().Errorf("shutting down server err: %v", err)
+		if e != nil && db != nil {
+			return s.setupFn(e, db)
 		}
-	}()
+	}
+
+	return nil
 }
 
-func (r *Orz) Wait() {
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt)
-	<-quit
-}
+// Quick 快速启动函数
+func Quick(configPath string, setupFn func(*echo.Echo, *gorm.DB) error) error {
+	simpleApp := NewSimpleApp(setupFn)
 
-func (r *Orz) Stop(ctx context.Context) error {
-	return r.echo.Shutdown(ctx)
-}
+	framework, err := NewFramework(
+		WithConfig(configPath),
+		WithLoggerFromConfig(),
+		WithDatabase(),
+		WithHTTP(),
+		WithApplication(simpleApp),
+	)
+	if err != nil {
+		return err
+	}
 
-func (r *Orz) Echo() *echo.Echo {
-	return r.echo
+	return framework.Run()
 }
