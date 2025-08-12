@@ -112,6 +112,15 @@ func GetPageRequest(c echo.Context, allowedFields ...string) *PageRequest {
 	return pr
 }
 
+// GetKeyword 从查询参数获取关键词搜索值
+func GetKeyword(c echo.Context, paramName ...string) string {
+	keyName := "keyword"
+	if len(paramName) > 0 && paramName[0] != "" {
+		keyName = paramName[0]
+	}
+	return c.QueryParam(keyName)
+}
+
 // BindAndValidate 绑定并验证请求数据
 func BindAndValidate(c echo.Context, v interface{}) error {
 	if err := c.Bind(v); err != nil {

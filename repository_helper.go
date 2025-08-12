@@ -9,13 +9,14 @@ import (
 
 // PageBuilder 分页查询构建器
 type PageBuilder[T any, ID comparable] struct {
-	repo      Repository[T, ID]
-	pageIndex int
-	pageSize  int
-	sort      Sort
-	matchers  []Matcher
-	selectSQL string
-	joins     []string
+	repo           Repository[T, ID]
+	pageIndex      int
+	pageSize       int
+	sort           Sort
+	matchers       []Matcher
+	keywordMatcher *KeywordMatcher
+	selectSQL      string
+	joins          []string
 }
 
 // NewPageBuilder 创建分页查询构建器
@@ -130,6 +131,18 @@ func (b *PageBuilder[T, ID]) Tags(name string, tags string) *PageBuilder[T, ID] 
 	return b
 }
 
+// Keyword 添加关键词搜索条件（多字段OR查询）
+func (b *PageBuilder[T, ID]) Keyword(fields []string, value any) *PageBuilder[T, ID] {
+	b.keywordMatcher = NewKeywordMatcher(fields, value)
+	return b
+}
+
+// KeywordWithCustomTable 添加自定义表的关键词搜索条件
+func (b *PageBuilder[T, ID]) KeywordWithCustomTable(fields []string, value any, customTable bool) *PageBuilder[T, ID] {
+	b.keywordMatcher = NewKeywordMatcherWithCustomTable(fields, value, customTable)
+	return b
+}
+
 // LeftJoin 添加左连接
 func (b *PageBuilder[T, ID]) LeftJoin(table, condition string) *PageBuilder[T, ID] {
 	joinSQL := fmt.Sprintf("LEFT JOIN %s ON %s", table, condition)
@@ -176,9 +189,9 @@ func (b *PageBuilder[T, ID]) Execute(ctx context.Context) (*PageResult[T], error
 		db = db.Joins(join)
 	}
 
-	// 应用查询匹配器
+	// 应用查询匹配器和关键词匹配器
 	var err error
-	db, err = ApplyMatchers(db, b.matchers, b.repo.GetTableName(), nil)
+	db, err = ApplyMatchersWithKeyword(db, b.matchers, b.keywordMatcher, b.repo.GetTableName(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("apply matchers failed: %w", err)
 	}
@@ -228,9 +241,9 @@ func ExecuteAsTyped[R any, T any, ID comparable](ctx context.Context, builder *P
 		db = db.Joins(join)
 	}
 
-	// 应用查询匹配器
+	// 应用查询匹配器和关键词匹配器
 	var err error
-	db, err = ApplyMatchers(db, builder.matchers, builder.repo.GetTableName(), nil)
+	db, err = ApplyMatchersWithKeyword(db, builder.matchers, builder.keywordMatcher, builder.repo.GetTableName(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("apply matchers failed: %w", err)
 	}

@@ -155,7 +155,8 @@ const (
 	MatcherNotEqual              MatcherMode = "not-equal"
 	MatcherNotIn                 MatcherMode = "not-in"
 
-	MatcherTags MatcherMode = "tags" // JSON数组标签查询
+	MatcherTags    MatcherMode = "tags"    // JSON数组标签查询
+	MatcherKeyword MatcherMode = "keyword" // 关键词查询（多字段OR查询）
 )
 
 // Empty 空值标记
@@ -169,12 +170,36 @@ type Matcher struct {
 	CustomTable bool // 自定义表
 }
 
+// KeywordMatcher 关键词匹配器（多字段OR查询）
+type KeywordMatcher struct {
+	Names       []string // 搜索的字段名列表
+	Value       any      // 搜索值
+	CustomTable bool     // 自定义表
+}
+
 // NewMatcher 创建查询匹配器
 func NewMatcher(name string, value any, mode MatcherMode) Matcher {
 	return Matcher{
 		Name:  name,
 		Value: value,
 		Mode:  mode,
+	}
+}
+
+// NewKeywordMatcher 创建关键词匹配器
+func NewKeywordMatcher(names []string, value any) *KeywordMatcher {
+	return &KeywordMatcher{
+		Names: names,
+		Value: value,
+	}
+}
+
+// NewKeywordMatcherWithCustomTable 创建自定义表的关键词匹配器
+func NewKeywordMatcherWithCustomTable(names []string, value any, customTable bool) *KeywordMatcher {
+	return &KeywordMatcher{
+		Names:       names,
+		Value:       value,
+		CustomTable: customTable,
 	}
 }
 
@@ -422,6 +447,70 @@ func (r *BaseRepository[T, ID]) wrapQuery(m Matcher) string {
 // likeValue 包装LIKE查询的值
 func (r *BaseRepository[T, ID]) likeValue(v any) string {
 	return "%" + cast.ToString(v) + "%"
+}
+
+// ApplyKeywordMatcher 应用关键词匹配器到查询
+func ApplyKeywordMatcher(db *gorm.DB, keywordMatcher *KeywordMatcher, tableName string) (*gorm.DB, error) {
+	if keywordMatcher == nil {
+		return db, nil
+	}
+	if keywordMatcher.Value == Empty || cast.ToString(keywordMatcher.Value) == "" {
+		return db, nil
+	}
+
+	// 包装LIKE查询的值
+	likeValue := func(v any) string {
+		return "%" + cast.ToString(v) + "%"
+	}
+
+	databaseType := DatabaseType(db.Dialector.Name())
+	var exprList = make([]clause.Expression, 0, len(keywordMatcher.Names))
+
+	for _, name := range keywordMatcher.Names {
+		var field string
+		if keywordMatcher.CustomTable {
+			field = CamelToSnake(name)
+		} else {
+			field = fmt.Sprintf("%s.%s", tableName, CamelToSnake(name))
+		}
+
+		switch databaseType {
+		case DatabaseMysql:
+			exprList = append(exprList, gorm.Expr(fmt.Sprintf("LOWER(%s) like LOWER(?)", field), likeValue(keywordMatcher.Value)))
+		case DatabaseSqlite:
+			exprList = append(exprList, gorm.Expr(fmt.Sprintf("%s like ?", field), likeValue(keywordMatcher.Value)))
+		case DatabasePostgres, DatabasePostgresql:
+			exprList = append(exprList, gorm.Expr(fmt.Sprintf("%s ILIKE ?", field), likeValue(keywordMatcher.Value)))
+		default:
+			return nil, fmt.Errorf("database type %s not supported for keyword search", databaseType)
+		}
+	}
+
+	if len(exprList) > 0 {
+		db = db.Clauses(clause.OrConditions{
+			Exprs: exprList,
+		})
+	}
+
+	return db, nil
+}
+
+// ApplyMatchersWithKeyword 应用匹配器和关键词匹配器到查询
+func ApplyMatchersWithKeyword(db *gorm.DB, matchers []Matcher, keywordMatcher *KeywordMatcher, tableName string, wrapQueryFunc func(Matcher) string) (*gorm.DB, error) {
+	// 先应用普通匹配器
+	var err error
+	db, err = ApplyMatchers(db, matchers, tableName, wrapQueryFunc)
+	if err != nil {
+		return nil, err
+	}
+
+	// 再应用关键词匹配器
+	db, err = ApplyKeywordMatcher(db, keywordMatcher, tableName)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
 
 // ApplyMatchers 应用匹配器到查询（独立函数，可被其他地方复用）
