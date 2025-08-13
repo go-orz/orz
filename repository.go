@@ -371,7 +371,7 @@ func (r *BaseRepository[T, ID]) ExistsById(ctx context.Context, id ID) (bool, er
 // UpdateById 根据ID更新实体
 func (r *BaseRepository[T, ID]) UpdateById(ctx context.Context, entity *T) error {
 	db := r.GetDB(ctx)
-	return db.Table(r.GetTableName()).Save(entity).Error
+	return db.Table(r.GetTableName()).Updates(entity).Error
 }
 
 // UpdateColumnsById 根据ID更新指定列

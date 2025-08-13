@@ -17,11 +17,7 @@ type Response struct {
 
 // Ok 成功响应
 func Ok(c echo.Context, data interface{}) error {
-	return c.JSON(http.StatusOK, Response{
-		Code:    0,
-		Message: "ok",
-		Data:    data,
-	})
+	return c.JSON(http.StatusOK, data)
 }
 
 // ErrorResponse 错误响应

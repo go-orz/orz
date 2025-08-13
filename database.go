@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -134,16 +133,13 @@ func (l *GormLogger) Trace(ctx context.Context, begin time.Time, fc func() (sql 
 	sql, rows := fc()
 	elapsed := time.Since(begin)
 
-	fields := []zapcore.Field{
-		zap.String("sql", sql),
-		zap.Int64("rows", rows),
-		zap.Duration("elapsed", elapsed),
-	}
+	sugar := l.logger.Sugar() // 从 zap.Logger 得到 SugaredLogger
 
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		fields = append(fields, zap.Error(err))
-		l.logger.Error("Database query failed", fields...)
+		sugar.Errorf("query failed | sql=%s | rows=%d | elapsed=%s | err=%v",
+			sql, rows, elapsed, err)
 	} else {
-		l.logger.Debug("Database query", fields...)
+		sugar.Debugf("query | sql=%s | rows=%d | elapsed=%s",
+			sql, rows, elapsed)
 	}
 }

@@ -10,68 +10,61 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// NewLoggerFromConfig 根据配置创建logger
 func NewLoggerFromConfig(cfg Log) (*zap.Logger, error) {
 	// 解析日志级别
 	level := parseLogLevel(cfg.Level)
 
-	// 配置编码器
-	encoderConfig := zap.NewProductionEncoderConfig()
-	encoderConfig.TimeKey = "time"
-	encoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
-	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+	// 基础 encoder 配置（无颜色，给文件用）
+	baseEncoderConfig := zap.NewProductionEncoderConfig()
+	baseEncoderConfig.TimeKey = "time"
+	baseEncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
+	baseEncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 
-	// 选择编码器类型
-	var encoder zapcore.Encoder
-	if strings.ToLower(cfg.Encode) == "json" {
-		encoder = zapcore.NewJSONEncoder(encoderConfig)
-	} else {
-		encoder = zapcore.NewConsoleEncoder(encoderConfig)
-	}
+	// 控制台 encoder 配置（带颜色）
+	consoleEncoderConfig := baseEncoderConfig
+	consoleEncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
 	var cores []zapcore.Core
 
-	// 文件输出
+	// 文件输出（无颜色）
 	if cfg.Filename != "" {
 		if err := ensureDir(cfg.Filename); err != nil {
 			return nil, err
 		}
 
-		// 使用 lumberjack 进行日志轮转
 		rotateWriter := &lumberjack.Logger{
 			Filename:  cfg.Filename,
-			MaxSize:   getMaxSize(cfg.MaxSize), // MB
-			MaxAge:    getMaxAge(cfg.MaxAge),   // 天数
-			Compress:  cfg.Compress,            // 是否压缩
-			LocalTime: true,                    // 使用本地时间
+			MaxSize:   getMaxSize(cfg.MaxSize),
+			MaxAge:    getMaxAge(cfg.MaxAge),
+			Compress:  cfg.Compress,
+			LocalTime: true,
 		}
 
-		fileCore := zapcore.NewCore(encoder, zapcore.AddSync(rotateWriter), level)
+		fileEncoder := zapcore.NewConsoleEncoder(baseEncoderConfig)
+		if strings.ToLower(cfg.Encode) == "json" {
+			fileEncoder = zapcore.NewJSONEncoder(baseEncoderConfig)
+		}
+
+		fileCore := zapcore.NewCore(fileEncoder, zapcore.AddSync(rotateWriter), level)
 		cores = append(cores, fileCore)
 	}
 
-	// 控制台输出
+	// 控制台输出（彩色）
 	if cfg.Console {
-		consoleEncoder := zapcore.NewConsoleEncoder(encoderConfig)
+		consoleEncoder := zapcore.NewConsoleEncoder(consoleEncoderConfig)
 		consoleCore := zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), level)
 		cores = append(cores, consoleCore)
 	}
 
-	// 如果没有任何输出，默认输出到控制台
+	// 如果都没设置，默认输出到彩色控制台
 	if len(cores) == 0 {
-		consoleEncoder := zapcore.NewConsoleEncoder(encoderConfig)
+		consoleEncoder := zapcore.NewConsoleEncoder(consoleEncoderConfig)
 		consoleCore := zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), level)
 		cores = append(cores, consoleCore)
 	}
 
-	// 合并所有核心
-	var core zapcore.Core
-	if len(cores) == 1 {
-		core = cores[0]
-	} else {
-		core = zapcore.NewTee(cores...)
-	}
-
+	// 合并 core
+	core := zapcore.NewTee(cores...)
 	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 	return logger, nil
 }
