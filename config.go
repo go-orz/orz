@@ -63,6 +63,7 @@ type Log struct {
 type Database struct {
 	Enabled  bool
 	Type     DatabaseType
+	URL      string
 	Mysql    MysqlCfg
 	Sqlite   SqliteConfig
 	Postgres PostgresCfg
@@ -70,7 +71,6 @@ type Database struct {
 }
 
 type MysqlCfg struct {
-	DSN             string        `yaml:"dsn"`
 	Hostname        string        `yaml:"hostname"`
 	Port            int           `yaml:"port"`
 	Username        string        `yaml:"username"`
@@ -82,7 +82,6 @@ type MysqlCfg struct {
 }
 
 type PostgresCfg struct {
-	DSN      string `yaml:"dsn"`
 	Hostname string `yaml:"hostname"`
 	Port     int    `yaml:"port"`
 	Username string `yaml:"username"`
@@ -114,7 +113,7 @@ func NewConfigManager() *ConfigManager {
 	v.SetDefault("log.compress", true)
 	v.SetDefault("database.enabled", true)
 	v.SetDefault("database.type", "sqlite")
-	v.SetDefault("database.sqlite.path", "data/app.db")
+	v.SetDefault("database.url", "data/app.db")
 	v.SetDefault("database.showSql", false)
 	v.SetDefault("server.addr", ":8080")
 

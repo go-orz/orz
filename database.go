@@ -32,21 +32,21 @@ func ConnectDatabaseWithLogger(cfg Database, zapLogger *zap.Logger) (*gorm.DB, e
 
 	switch cfg.Type {
 	case DatabaseMysql:
-		return ConnectMysql(cfg.Mysql, wrapLogger)
+		return ConnectMysql(cfg.URL, cfg.Mysql, wrapLogger)
 	case DatabaseSqlite:
-		return ConnectSqlite(cfg.Sqlite, wrapLogger)
+		return ConnectSqlite(cfg.URL, cfg.Sqlite, wrapLogger)
 	case DatabasePostgres, DatabasePostgresql:
-		return ConnectPostgresql(cfg.Postgres, wrapLogger)
+		return ConnectPostgresql(cfg.URL, cfg.Postgres, wrapLogger)
 	default:
 		return nil, fmt.Errorf("unknown database type: %s", cfg.Type)
 	}
 }
 
 // ConnectMysql 连接MySQL数据库
-func ConnectMysql(cfg MysqlCfg, logger logger.Interface) (*gorm.DB, error) {
+func ConnectMysql(url string, cfg MysqlCfg, logger logger.Interface) (*gorm.DB, error) {
 	var dsn string
-	if cfg.DSN != "" {
-		dsn = cfg.DSN
+	if url != "" {
+		dsn = url
 	} else {
 		dsn = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 			cfg.Username,
@@ -67,10 +67,10 @@ func ConnectMysql(cfg MysqlCfg, logger logger.Interface) (*gorm.DB, error) {
 }
 
 // ConnectPostgresql 连接PostgreSQL数据库
-func ConnectPostgresql(cfg PostgresCfg, logger logger.Interface) (*gorm.DB, error) {
+func ConnectPostgresql(url string, cfg PostgresCfg, logger logger.Interface) (*gorm.DB, error) {
 	var dsn string
-	if cfg.DSN != "" {
-		dsn = cfg.DSN
+	if url != "" {
+		dsn = url
 	} else {
 		dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable TimeZone=Asia/Shanghai",
 			cfg.Hostname, cfg.Username, cfg.Password, cfg.Database, cfg.Port)
@@ -86,8 +86,14 @@ func ConnectPostgresql(cfg PostgresCfg, logger logger.Interface) (*gorm.DB, erro
 }
 
 // ConnectSqlite 连接SQLite数据库
-func ConnectSqlite(cfg SqliteConfig, logger logger.Interface) (*gorm.DB, error) {
-	db, err := gorm.Open(sqlite.Open(cfg.Path), &gorm.Config{
+func ConnectSqlite(url string, cfg SqliteConfig, logger logger.Interface) (*gorm.DB, error) {
+	var dsn string
+	if url != "" {
+		dsn = url
+	} else {
+		dsn = cfg.Path
+	}
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: logger,
 	})
 	if err != nil {
@@ -96,7 +102,7 @@ func ConnectSqlite(cfg SqliteConfig, logger logger.Interface) (*gorm.DB, error) 
 	return db, nil
 }
 
-// GORM 日志适配器
+// GormLogger GORM 日志适配器
 type GormLogger struct {
 	logger *zap.Logger
 }
