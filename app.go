@@ -165,18 +165,8 @@ func (a *App) GetConfig() *Config {
 	return a.configManager.GetConfig()
 }
 
-// Init 初始化应用（保留用于兼容性，现在什么都不做）
-func (a *App) Init() error {
-	return nil
-}
-
 // Run 运行应用
 func (a *App) Run() error {
-	// 初始化所有模块
-	if err := a.Init(); err != nil {
-		return err
-	}
-
 	// 获取Echo实例
 	e, err := a.GetEcho()
 	if err != nil {
