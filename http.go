@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 )
@@ -77,7 +78,7 @@ type PageRequest struct {
 	SortAllowedFields []string  `json:"-"`         // 允许的排序字段
 }
 
-// GetPageRequest 从查询参数获取分页信息
+// GetPageRequest 从查询参数获取分页信息（驼峰命名参数）
 func GetPageRequest(c echo.Context, allowedFields ...string) *PageRequest {
 	var pr = &PageRequest{
 		PageIndex:         1,
@@ -102,7 +103,52 @@ func GetPageRequest(c echo.Context, allowedFields ...string) *PageRequest {
 		pr.SortField = sortField
 	}
 	if sortOrder := c.QueryParam("sortOrder"); sortOrder != "" {
-		pr.SortOrder = SortOrder(sortOrder)
+		switch strings.ToLower(sortOrder) {
+		case "asc", "ascend":
+			pr.SortOrder = ASC
+		case "desc", "descend":
+			pr.SortOrder = DESC
+		default:
+			pr.SortOrder = DESC
+		}
+	}
+
+	return pr
+}
+
+// GetPageRequestUnderscore 从查询参数获取分页信息（下划线命名参数）
+func GetPageRequestUnderscore(c echo.Context, allowedFields ...string) *PageRequest {
+	var pr = &PageRequest{
+		PageIndex:         1,
+		PageSize:          10,
+		SortField:         "",
+		SortOrder:         "",
+		SortAllowedFields: allowedFields,
+	}
+
+	if pageStr := c.QueryParam("page_index"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			pr.PageIndex = p
+		}
+	}
+
+	if sizeStr := c.QueryParam("page_size"); sizeStr != "" {
+		if s, err := strconv.Atoi(sizeStr); err == nil && s > 0 && s <= 100 {
+			pr.PageSize = s
+		}
+	}
+	if sortField := c.QueryParam("sort_field"); sortField != "" {
+		pr.SortField = sortField
+	}
+	if sortOrder := c.QueryParam("sort_order"); sortOrder != "" {
+		switch strings.ToLower(sortOrder) {
+		case "asc", "ascend":
+			pr.SortOrder = ASC
+		case "desc", "descend":
+			pr.SortOrder = DESC
+		default:
+			pr.SortOrder = DESC
+		}
 	}
 
 	return pr

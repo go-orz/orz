@@ -124,20 +124,12 @@ func (f *Framework) App() *App {
 
 // GetDB 获取数据库实例
 func (f *Framework) GetDB() *gorm.DB {
-	db, err := f.app.GetDatabase()
-	if err != nil {
-		return nil
-	}
-	return db
+	return f.app.GetDatabase()
 }
 
 // GetEcho 获取Echo实例
 func (f *Framework) GetEcho() *echo.Echo {
-	echo, err := f.app.GetEcho()
-	if err != nil {
-		return nil
-	}
-	return echo
+	return f.app.GetEcho()
 }
 
 // SimpleApp 简单应用实现
@@ -159,14 +151,14 @@ func (s *SimpleApp) Configure(a *App) error {
 		var e *echo.Echo
 		var db *gorm.DB
 
-		if ee, err := a.GetEcho(); err == nil {
-			e = ee
-		}
-		if database, err := a.GetDatabase(); err == nil {
-			db = database
-		}
+		// 获取Echo实例（可能为nil）
+		e = a.GetEcho()
 
-		if e != nil && db != nil {
+		// 获取数据库实例（可能为nil）
+		db = a.GetDatabase()
+
+		// 仅当至少有一个可用时才执行设置函数
+		if e != nil || db != nil {
 			return s.setupFn(e, db)
 		}
 	}

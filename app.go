@@ -57,7 +57,7 @@ func (a *App) EnableLogger() error {
 // EnableDatabase 启用数据库
 func (a *App) EnableDatabase() error {
 	config := a.GetConfig()
-	if !config.Database.Enabled {
+	if config == nil || !config.Database.Enabled {
 		return fmt.Errorf("database not enabled in config")
 	}
 
@@ -125,19 +125,13 @@ func (a *App) SetLogger(logger *zap.Logger) {
 }
 
 // GetDatabase 获取数据库连接
-func (a *App) GetDatabase() (*gorm.DB, error) {
-	if a.database == nil {
-		return nil, fmt.Errorf("database not configured")
-	}
-	return a.database, nil
+func (a *App) GetDatabase() *gorm.DB {
+	return a.database
 }
 
 // GetEcho 获取Echo实例
-func (a *App) GetEcho() (*echo.Echo, error) {
-	if a.echo == nil {
-		return nil, fmt.Errorf("echo not configured")
-	}
-	return a.echo, nil
+func (a *App) GetEcho() *echo.Echo {
+	return a.echo
 }
 
 // Context 获取应用上下文
@@ -168,8 +162,8 @@ func (a *App) GetConfig() *Config {
 // Run 运行应用
 func (a *App) Run() error {
 	// 获取Echo实例
-	e, err := a.GetEcho()
-	if err != nil {
+	e := a.GetEcho()
+	if e == nil {
 		a.Logger().Info("no HTTP server configured, running in daemon mode")
 		return nil
 	}
