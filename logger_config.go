@@ -10,7 +10,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-func NewLoggerFromConfig(cfg Log) (*zap.Logger, error) {
+func NewLoggerFromConfig(cfg LogConfig) (*zap.Logger, error) {
 	// 解析日志级别
 	level := parseLogLevel(cfg.Level)
 

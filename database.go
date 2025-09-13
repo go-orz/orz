@@ -6,21 +6,21 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/glebarez/sqlite"
 	"go.uber.org/zap"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
 // ConnectDatabase 连接数据库
-func ConnectDatabase(cfg Database) (*gorm.DB, error) {
+func ConnectDatabase(cfg DatabaseConfig) (*gorm.DB, error) {
 	return ConnectDatabaseWithLogger(cfg, nil)
 }
 
 // ConnectDatabaseWithLogger 连接数据库并指定日志器
-func ConnectDatabaseWithLogger(cfg Database, zapLogger *zap.Logger) (*gorm.DB, error) {
+func ConnectDatabaseWithLogger(cfg DatabaseConfig, zapLogger *zap.Logger) (*gorm.DB, error) {
 	var wrapLogger logger.Interface
 	if cfg.ShowSql && zapLogger != nil {
 		wrapLogger = GormWrapLogger(zapLogger)

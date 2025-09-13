@@ -202,19 +202,19 @@ func (a *App) runHTTPServer(e *echo.Echo) error {
 	// 根据配置启动HTTP或HTTPS服务器
 	if config != nil && config.Server.TLS.Enabled {
 		if config.Server.TLS.Auto {
-			a.Logger().Info("starting HTTPS server with auto TLS")
+			a.Logger().Info("starting HTTPS server with auto TLSConfig")
 			if err := e.StartAutoTLS(addr); err != nil {
 				a.Logger().Info("server stopped")
 			}
 		} else if config.Server.TLS.Cert != "" && config.Server.TLS.Key != "" {
-			a.Logger().Info("starting HTTPS server with custom TLS",
+			a.Logger().Info("starting HTTPS server with custom TLSConfig",
 				zap.String("cert", config.Server.TLS.Cert),
 				zap.String("key", config.Server.TLS.Key))
 			if err := e.StartTLS(addr, config.Server.TLS.Cert, config.Server.TLS.Key); err != nil {
 				a.Logger().Info("server stopped")
 			}
 		} else {
-			a.Logger().Error("TLS enabled but cert/key not provided, falling back to HTTP")
+			a.Logger().Error("TLSConfig enabled but cert/key not provided, falling back to HTTP")
 			if err := e.Start(addr); err != nil {
 				a.Logger().Info("server stopped")
 			}

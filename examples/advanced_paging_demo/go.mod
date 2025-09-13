@@ -1,8 +1,8 @@
-module simple-example
+module advanced-paging-demo
 
 go 1.25.0
 
-replace github.com/go-orz/orz => ../..
+replace github.com/go-orz/orz => ../../
 
 require (
 	github.com/go-orz/orz v0.0.0-00010101000000-000000000000

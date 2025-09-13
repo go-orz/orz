@@ -30,27 +30,27 @@ func (r AppConfig) Unmarshal(v any) error {
 }
 
 type Config struct {
-	Log      Log       // 日志
-	Database Database  // 数据库配置
-	Server   Server    // Web 服务器配置
-	App      AppConfig // 应用程序个性化配置
+	Log      LogConfig      // 日志配置
+	Database DatabaseConfig // 数据库配置
+	Server   ServerConfig   // Web 服务器配置
+	App      AppConfig      // 应用程序个性化配置
 }
 
-type Server struct {
+type ServerConfig struct {
 	Addr        string
-	TLS         TLS
+	TLS         TLSConfig
 	IPExtractor string
 	IPTrustList []string // 信任的IP
 }
 
-type TLS struct {
+type TLSConfig struct {
 	Enabled bool
 	Auto    bool
 	Cert    string
 	Key     string
 }
 
-type Log struct {
+type LogConfig struct {
 	Level    string // debug, info, warn, error
 	Filename string // 日志文件路径
 	Encode   string // console, json
@@ -60,7 +60,7 @@ type Log struct {
 	Compress bool   // 是否压缩日志
 }
 
-type Database struct {
+type DatabaseConfig struct {
 	Enabled  bool
 	Type     DatabaseType
 	URL      string

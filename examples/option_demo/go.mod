@@ -1,13 +1,13 @@
-module simple-example
+module option-demo
 
 go 1.25.0
 
-replace github.com/go-orz/orz => ../..
+replace github.com/go-orz/orz => ../../
 
 require (
 	github.com/go-orz/orz v0.0.0-00010101000000-000000000000
 	github.com/labstack/echo/v4 v4.13.4
-	gorm.io/gorm v1.31.0
+	go.uber.org/zap v1.27.0
 )
 
 require (
@@ -38,7 +38,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.42.0 // indirect
 	golang.org/x/net v0.44.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
@@ -50,4 +49,5 @@ require (
 	gorm.io/driver/mysql v1.6.0 // indirect
 	gorm.io/driver/postgres v1.6.0 // indirect
 	gorm.io/driver/sqlite v1.6.0 // indirect
+	gorm.io/gorm v1.31.0 // indirect
 )
