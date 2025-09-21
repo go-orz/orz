@@ -101,6 +101,10 @@ func GetPageRequest(c echo.Context, allowedFields ...string) *PageRequest {
 	}
 	if sortField := c.QueryParam("sortField"); sortField != "" {
 		pr.SortField = sortField
+	} else {
+		if len(allowedFields) > 0 {
+			pr.SortField = allowedFields[0]
+		}
 	}
 	if sortOrder := c.QueryParam("sortOrder"); sortOrder != "" {
 		switch strings.ToLower(sortOrder) {
@@ -111,6 +115,8 @@ func GetPageRequest(c echo.Context, allowedFields ...string) *PageRequest {
 		default:
 			pr.SortOrder = DESC
 		}
+	} else {
+		pr.SortOrder = DESC
 	}
 
 	return pr

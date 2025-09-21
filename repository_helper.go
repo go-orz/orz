@@ -143,6 +143,11 @@ func (b *PageBuilder[T, ID]) KeywordWithCustomTable(fields []string, value any, 
 	return b
 }
 
+func (b *PageBuilder[T, ID]) Join(joinSQL string) *PageBuilder[T, ID] {
+	b.joins = append(b.joins, joinSQL)
+	return b
+}
+
 // LeftJoin 添加左连接
 func (b *PageBuilder[T, ID]) LeftJoin(table, condition string) *PageBuilder[T, ID] {
 	joinSQL := fmt.Sprintf("LEFT JOIN %s ON %s", table, condition)

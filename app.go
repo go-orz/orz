@@ -45,11 +45,7 @@ func (a *App) EnableLogger() error {
 		return fmt.Errorf("config not loaded")
 	}
 
-	logger, err := NewLoggerFromConfig(config.Log)
-	if err != nil {
-		return fmt.Errorf("failed to create logger: %w", err)
-	}
-
+	logger := NewLoggerFromConfig(config.Log)
 	a.SetLogger(logger)
 	return nil
 }

@@ -113,7 +113,6 @@ func NewConfigManager() *ConfigManager {
 	v.SetDefault("log.compress", true)
 	v.SetDefault("database.enabled", true)
 	v.SetDefault("database.type", "sqlite")
-	v.SetDefault("database.url", "data/app.db")
 	v.SetDefault("database.showSql", false)
 	v.SetDefault("server.addr", ":8080")
 

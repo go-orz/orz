@@ -10,7 +10,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-func NewLoggerFromConfig(cfg LogConfig) (*zap.Logger, error) {
+func NewLoggerFromConfig(cfg LogConfig) *zap.Logger {
 	// 解析日志级别
 	level := parseLogLevel(cfg.Level)
 
@@ -28,10 +28,6 @@ func NewLoggerFromConfig(cfg LogConfig) (*zap.Logger, error) {
 
 	// 文件输出（无颜色）
 	if cfg.Filename != "" {
-		if err := ensureDir(cfg.Filename); err != nil {
-			return nil, err
-		}
-
 		rotateWriter := &lumberjack.Logger{
 			Filename:  cfg.Filename,
 			MaxSize:   getMaxSize(cfg.MaxSize),
@@ -66,7 +62,7 @@ func NewLoggerFromConfig(cfg LogConfig) (*zap.Logger, error) {
 	// 合并 core
 	core := zapcore.NewTee(cores...)
 	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
-	return logger, nil
+	return logger
 }
 
 // parseLogLevel 解析日志级别
