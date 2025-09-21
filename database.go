@@ -8,6 +8,7 @@ import (
 
 	"github.com/glebarez/sqlite"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -119,8 +120,18 @@ func GormErrorLogger(zapLogger *zap.Logger) logger.Interface {
 }
 
 func (l *GormLogger) LogMode(level logger.LogLevel) logger.Interface {
-	newLogger := &GormLogger{logger: l.logger}
-	return newLogger
+	switch level {
+	case logger.Silent:
+		l.logger = l.logger.WithOptions(zap.IncreaseLevel(zapcore.FatalLevel))
+	case logger.Error:
+		l.logger = l.logger.WithOptions(zap.IncreaseLevel(zapcore.ErrorLevel))
+	case logger.Warn:
+		l.logger = l.logger.WithOptions(zap.IncreaseLevel(zapcore.WarnLevel))
+	case logger.Info:
+		l.logger = l.logger.WithOptions(zap.IncreaseLevel(zapcore.InfoLevel))
+	}
+
+	return l
 }
 
 func (l *GormLogger) Info(ctx context.Context, format string, args ...interface{}) {
