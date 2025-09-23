@@ -21,7 +21,10 @@ func NewLoggerFromConfig(cfg LogConfig) *zap.Logger {
 	baseEncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 
 	// 控制台 encoder 配置（带颜色）
-	consoleEncoderConfig := baseEncoderConfig
+	consoleEncoderConfig := zap.NewProductionEncoderConfig()
+	consoleEncoderConfig.TimeKey = "time"
+	consoleEncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
+	consoleEncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 	consoleEncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
 	var cores []zapcore.Core
@@ -36,9 +39,11 @@ func NewLoggerFromConfig(cfg LogConfig) *zap.Logger {
 			LocalTime: true,
 		}
 
-		fileEncoder := zapcore.NewConsoleEncoder(baseEncoderConfig)
+		var fileEncoder zapcore.Encoder
 		if strings.ToLower(cfg.Encode) == "json" {
 			fileEncoder = zapcore.NewJSONEncoder(baseEncoderConfig)
+		} else {
+			fileEncoder = zapcore.NewConsoleEncoder(baseEncoderConfig)
 		}
 
 		fileCore := zapcore.NewCore(fileEncoder, zapcore.AddSync(rotateWriter), level)
@@ -46,14 +51,7 @@ func NewLoggerFromConfig(cfg LogConfig) *zap.Logger {
 	}
 
 	// 控制台输出（彩色）
-	if cfg.Console {
-		consoleEncoder := zapcore.NewConsoleEncoder(consoleEncoderConfig)
-		consoleCore := zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), level)
-		cores = append(cores, consoleCore)
-	}
-
-	// 如果都没设置，默认输出到彩色控制台
-	if len(cores) == 0 {
+	if cfg.Console || len(cores) == 0 {
 		consoleEncoder := zapcore.NewConsoleEncoder(consoleEncoderConfig)
 		consoleCore := zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), level)
 		cores = append(cores, consoleCore)
