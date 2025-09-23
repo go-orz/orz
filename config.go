@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -102,6 +103,10 @@ type ConfigManager struct {
 func NewConfigManager() *ConfigManager {
 	v := viper.New()
 	v.SetConfigType("yaml")
+
+	// 启用环境变量支持
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// 设置默认值
 	v.SetDefault("log.level", "info")
