@@ -134,11 +134,11 @@ func (f *Framework) GetEcho() *echo.Echo {
 
 // SimpleApp 简单应用实现
 type SimpleApp struct {
-	setupFn func(*echo.Echo, *gorm.DB) error
+	setupFn func(app *App) error
 }
 
 // NewSimpleApp 创建简单应用
-func NewSimpleApp(setupFn func(*echo.Echo, *gorm.DB) error) *SimpleApp {
+func NewSimpleApp(setupFn func(app *App) error) *SimpleApp {
 	return &SimpleApp{
 		setupFn: setupFn,
 	}
@@ -148,26 +148,14 @@ func NewSimpleApp(setupFn func(*echo.Echo, *gorm.DB) error) *SimpleApp {
 func (s *SimpleApp) Configure(a *App) error {
 	// 执行自定义设置函数
 	if s.setupFn != nil {
-		var e *echo.Echo
-		var db *gorm.DB
-
-		// 获取Echo实例（可能为nil）
-		e = a.GetEcho()
-
-		// 获取数据库实例（可能为nil）
-		db = a.GetDatabase()
-
-		// 仅当至少有一个可用时才执行设置函数
-		if e != nil || db != nil {
-			return s.setupFn(e, db)
-		}
+		return s.setupFn(a)
 	}
 
 	return nil
 }
 
 // Quick 快速启动函数
-func Quick(configPath string, setupFn func(*echo.Echo, *gorm.DB) error) error {
+func Quick(configPath string, setupFn func(app *App) error) error {
 	simpleApp := NewSimpleApp(setupFn)
 
 	framework, err := NewFramework(
