@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/spf13/viper"
 )
@@ -31,55 +30,52 @@ func (r AppConfig) Unmarshal(v any) error {
 }
 
 type Config struct {
-	Log      LogConfig      // 日志配置
-	Database DatabaseConfig // 数据库配置
-	Server   ServerConfig   // Web 服务器配置
-	App      AppConfig      // 应用程序个性化配置
+	Log      LogConfig      `yaml:"log"`      // 日志配置
+	Database DatabaseConfig `yaml:"database"` // 数据库配置
+	Server   ServerConfig   `yaml:"server"`   // Web 服务器配置
+	App      AppConfig      `yaml:"app"`      // 应用程序个性化配置
 }
 
 type ServerConfig struct {
-	Addr        string
-	TLS         TLSConfig
-	IPExtractor string
-	IPTrustList []string // 信任的IP
+	Addr        string    `yaml:"addr"`
+	TLS         TLSConfig `yaml:"tls"`
+	IPExtractor string    `yaml:"ip_extractor"`
+	IPTrustList []string  `yaml:"ip_trust_list"` // 信任的IP
 }
 
 type TLSConfig struct {
-	Enabled bool
-	Auto    bool
-	Cert    string
-	Key     string
+	Enabled bool   `yaml:"enabled"`
+	Auto    bool   `yaml:"auto"`
+	Cert    string `yaml:"cert"`
+	Key     string `yaml:"key"`
 }
 
 type LogConfig struct {
-	Level    string // debug, info, warn, error
-	Filename string // 日志文件路径
-	Encode   string // console, json
-	Console  bool   // 是否输出到控制台
-	MaxSize  int    // 日志文件最大大小(MB)
-	MaxAge   int    // 日志保留天数
-	Compress bool   // 是否压缩日志
+	Level    string `yaml:"level"`    // debug, info, warn, error
+	Filename string `yaml:"filename"` // 日志文件路径
+	Encode   string `yaml:"encode"`   // console, json
+	Console  bool   `yaml:"console"`  // 是否输出到控制台
+	MaxSize  int    `yaml:"max_size"` // 日志文件最大大小(MB)
+	MaxAge   int    `yaml:"max_age"`  // 日志保留天数
+	Compress bool   `yaml:"compress"` // 是否压缩日志
 }
 
 type DatabaseConfig struct {
-	Enabled  bool
-	Type     DatabaseType
-	URL      string
-	Mysql    MysqlCfg
-	Sqlite   SqliteConfig
-	Postgres PostgresCfg
-	ShowSql  bool
+	Enabled  bool         `yaml:"enabled"`
+	Type     DatabaseType `yaml:"type"`
+	URL      string       `yaml:"url"`
+	Mysql    MysqlCfg     `yaml:"mysql"`
+	Sqlite   SqliteConfig `yaml:"sqlite"`
+	Postgres PostgresCfg  `yaml:"postgres"`
+	ShowSql  bool         `yaml:"show_sql"`
 }
 
 type MysqlCfg struct {
-	Hostname        string        `yaml:"hostname"`
-	Port            int           `yaml:"port"`
-	Username        string        `yaml:"username"`
-	Password        string        `yaml:"password"`
-	Database        string        `yaml:"database"`
-	MaxIdleConns    int           `yaml:"max-idle-conns"`
-	MaxOpenConns    int           `yaml:"max-open-conns"`
-	ConnMaxLifetime time.Duration `yaml:"conn-max-lifetime"`
+	Hostname string `yaml:"hostname"`
+	Port     int    `yaml:"port"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	Database string `yaml:"database"`
 }
 
 type PostgresCfg struct {
@@ -91,7 +87,7 @@ type PostgresCfg struct {
 }
 
 type SqliteConfig struct {
-	Path string
+	Path string `yaml:"path"`
 }
 
 // ConfigManager 配置管理器
@@ -113,12 +109,12 @@ func NewConfigManager() *ConfigManager {
 	v.SetDefault("log.filename", "")
 	v.SetDefault("log.encode", "console")
 	v.SetDefault("log.console", true)
-	v.SetDefault("log.maxSize", 100)
-	v.SetDefault("log.maxAge", 7)
+	v.SetDefault("log.max_size", 100)
+	v.SetDefault("log.max_age", 7)
 	v.SetDefault("log.compress", true)
 	v.SetDefault("database.enabled", true)
 	v.SetDefault("database.type", "sqlite")
-	v.SetDefault("database.showSql", false)
+	v.SetDefault("database.show_sql", false)
 	v.SetDefault("server.addr", ":8080")
 
 	return &ConfigManager{viper: v}

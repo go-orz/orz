@@ -3,8 +3,10 @@ package orz
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -76,20 +78,32 @@ func (a *App) EnableHTTP() {
 	// 应用服务器配置
 	config := a.GetConfig()
 	if config != nil {
-		// 配置IP提取器
-		if config.Server.IPExtractor != "" {
-			switch config.Server.IPExtractor {
-			case "X-Forwarded-For":
-				e.IPExtractor = echo.ExtractIPFromXFFHeader()
-			case "X-Real-IP":
-				e.IPExtractor = echo.ExtractIPFromRealIPHeader()
-			}
-		}
-
 		// 配置信任的IP列表
-		if len(config.Server.IPTrustList) > 0 {
+		ipTrustList := config.Server.IPTrustList
+		if len(ipTrustList) == 0 {
 			// 这里可以添加IP白名单中间件的逻辑
-			a.Logger().Info("IP trust list configured", zap.Strings("trustedIPs", config.Server.IPTrustList))
+			ipTrustList = []string{"0.0.0.0/0"}
+		}
+		a.Logger().Info("IP trust list configured", zap.Strings("trustedIPs", ipTrustList))
+
+		var options = make([]echo.TrustOption, 0, len(ipTrustList))
+		for _, ip := range ipTrustList {
+			_, ipNet, err := net.ParseCIDR(ip)
+			if err != nil {
+				a.Logger().Warn("failed to parse IP trust list", zap.String("ip", ip), zap.Error(err))
+				continue
+			}
+			options = append(options, echo.TrustIPRange(ipNet))
+		}
+		// 配置IP提取器
+		ipExtractor := strings.ToLower(config.Server.IPExtractor)
+		switch ipExtractor {
+		case "x-forwarded-for":
+			e.IPExtractor = echo.ExtractIPFromXFFHeader(options...)
+		case "x-real-ip":
+			e.IPExtractor = echo.ExtractIPFromRealIPHeader(options...)
+		case "direct":
+			e.IPExtractor = echo.ExtractIPDirect()
 		}
 	}
 
