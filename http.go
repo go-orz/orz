@@ -95,7 +95,7 @@ func GetPageRequest(c echo.Context, allowedFields ...string) *PageRequest {
 	}
 
 	if sizeStr := c.QueryParam("pageSize"); sizeStr != "" {
-		if s, err := strconv.Atoi(sizeStr); err == nil && s > 0 && s <= 100 {
+		if s, err := strconv.Atoi(sizeStr); err == nil && s > 0 {
 			pr.PageSize = s
 		}
 	}
@@ -139,7 +139,7 @@ func GetPageRequestUnderscore(c echo.Context, allowedFields ...string) *PageRequ
 	}
 
 	if sizeStr := c.QueryParam("page_size"); sizeStr != "" {
-		if s, err := strconv.Atoi(sizeStr); err == nil && s > 0 && s <= 100 {
+		if s, err := strconv.Atoi(sizeStr); err == nil && s > 0 {
 			pr.PageSize = s
 		}
 	}
