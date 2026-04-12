@@ -9,31 +9,24 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// Response 标准响应结构
-type Response struct {
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
-}
-
 // Ok 成功响应
 func Ok(c echo.Context, data interface{}) error {
-	return Respond(c, http.StatusOK, "ok", data)
+	return c.JSON(http.StatusOK, data)
 }
 
 // Created 201成功响应
 func Created(c echo.Context, data interface{}) error {
-	return Respond(c, http.StatusCreated, "created", data)
+	return c.JSON(http.StatusCreated, data)
 }
 
-// Respond 自定义状态码和消息的标准响应
-func Respond(c echo.Context, status int, message string, data interface{}) error {
-	return writeResponse(c, status, message, data)
+// Message 自定义状态码消息响应
+func Message(c echo.Context, status int, message string) error {
+	return writeMessage(c, status, message)
 }
 
 // ErrorResponse 错误响应
 func ErrorResponse(c echo.Context, code int, message string) error {
-	return Respond(c, code, message, nil)
+	return Message(c, code, message)
 }
 
 // BadRequest 400错误
@@ -177,14 +170,12 @@ func BindAndValidate(c echo.Context, v interface{}) error {
 	return nil
 }
 
-func writeResponse(c echo.Context, status int, message string, data interface{}) error {
+func writeMessage(c echo.Context, status int, message string) error {
 	if message == "" {
 		message = http.StatusText(status)
 	}
 
-	return c.JSON(status, Response{
-		Code:    status,
-		Message: message,
-		Data:    data,
+	return c.JSON(status, map[string]string{
+		"message": message,
 	})
 }

@@ -22,12 +22,12 @@ func TestOkUsesResponseEnvelope(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	var response Response
+	var response map[string]string
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if response.Code != http.StatusOK || response.Message != "ok" {
-		t.Fatalf("unexpected response envelope: %+v", response)
+	if response["name"] != "orz" {
+		t.Fatalf("unexpected response body: %+v", response)
 	}
 }
 
@@ -44,33 +44,55 @@ func TestErrorResponseUsesHTTPStatus(t *testing.T) {
 		t.Fatalf("expected status 400, got %d", rec.Code)
 	}
 
-	var response Response
+	var response map[string]string
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if response.Code != http.StatusBadRequest || response.Message != "bad request" {
+	if response["message"] != "bad request" {
 		t.Fatalf("unexpected error response: %+v", response)
 	}
 }
 
-func TestRespondUsesCustomMessageAndData(t *testing.T) {
+func TestMessageUsesCustomMessage(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
 	ctx := e.NewContext(req, rec)
 
-	if err := Respond(ctx, http.StatusAccepted, "accepted", map[string]string{"task": "sync"}); err != nil {
-		t.Fatalf("Respond returned error: %v", err)
+	if err := Message(ctx, http.StatusAccepted, "accepted"); err != nil {
+		t.Fatalf("Message returned error: %v", err)
 	}
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("expected status 202, got %d", rec.Code)
 	}
 
-	var response Response
+	var response map[string]string
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	if response.Code != http.StatusAccepted || response.Message != "accepted" {
-		t.Fatalf("unexpected response envelope: %+v", response)
+	if response["message"] != "accepted" {
+		t.Fatalf("unexpected response body: %+v", response)
+	}
+}
+
+func TestMessageUsesStatusTextWhenMessageIsEmpty(t *testing.T) {
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	ctx := e.NewContext(req, rec)
+
+	if err := Message(ctx, http.StatusAccepted, ""); err != nil {
+		t.Fatalf("Message returned error: %v", err)
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("expected status 202, got %d", rec.Code)
+	}
+
+	var response map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if response["message"] != http.StatusText(http.StatusAccepted) {
+		t.Fatalf("unexpected response body: %+v", response)
 	}
 }

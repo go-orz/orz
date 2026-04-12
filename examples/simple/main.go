@@ -32,7 +32,7 @@ func main() {
 
 		// 设置路由
 		e.GET("/", func(c echo.Context) error {
-			return orz.Respond(c, 200, "Hello from ORZ framework!", nil)
+			return orz.Message(c, 200, "Hello from ORZ framework!")
 		})
 
 		e.GET("/users", func(c echo.Context) error {

@@ -52,7 +52,7 @@ func main() {
 
         // 设置路由
         e.GET("/", func(c echo.Context) error {
-            return orz.Respond(c, 200, "Hello from ORZ!", nil)
+            return orz.Message(c, 200, "Hello from ORZ!")
         })
         
         return nil
@@ -72,15 +72,12 @@ import _ "github.com/go-orz/orz/drivers/sqlite"
 
 如果你使用 `go mod tidy`，Go 会自动补齐对应驱动子模块依赖。
 
-标准 JSON 响应格式：
+HTTP helper 默认行为：
 
-```json
-{
-  "code": 200,
-  "message": "ok",
-  "data": {}
-}
-```
+- `orz.Ok(c, data)` 直接返回原始 JSON 数据
+- `orz.Created(c, data)` 直接返回原始 JSON 数据
+- `orz.Message(c, status, message)` 返回最小的 `{ "message": "..." }`
+- `orz.ErrorResponse(c, code, message)` 返回最小的 `{ "message": "..." }`
 
 ### 配置文件 (config.yaml)
 

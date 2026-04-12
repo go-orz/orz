@@ -60,7 +60,8 @@ Do not publish a driver submodule tag that points at a root-module version which
 
 These contracts should be treated as framework invariants.
 
-- HTTP responses use the `Response{code,message,data}` envelope
+- HTTP success responses return plain JSON data
+- HTTP helper-generated message-only responses use `Message/ErrorResponse` and return `{message: "..."}`
 - paging helpers return `PageResult{items,total}`
 - framework initialization order is fixed internally, regardless of option call order
 - driver registration is explicit through blank imports of driver submodules

@@ -129,7 +129,7 @@ func (a *AdvancedPagingDemoApp) Configure(app *orz.App) error {
 			return orz.InternalServerError(c, err.Error())
 		}
 
-		return orz.Respond(c, 200, "许可证列表（带创建者信息）", result)
+		return orz.Ok(c, result)
 	})
 
 	// 基础查询：原类型的许可证列表
@@ -143,11 +143,11 @@ func (a *AdvancedPagingDemoApp) Configure(app *orz.App) error {
 			return orz.InternalServerError(c, err.Error())
 		}
 
-		return orz.Respond(c, 200, "基础许可证列表", result)
+		return orz.Ok(c, result)
 	})
 
 	e.GET("/", func(c echo.Context) error {
-		return orz.Respond(c, 200, "分页查询示例 - PageBuilder", map[string]interface{}{
+		return orz.Ok(c, map[string]interface{}{
 			"description": "使用优雅的PageBuilder进行分页查询",
 			"endpoints": []string{
 				"GET /licenses?keyword=MIT - 连表查询（带创建者信息）",

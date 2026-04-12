@@ -158,7 +158,7 @@ func (a *CleanPagingDemoApp) Configure(app *orz.App) error {
 			return orz.InternalServerError(c, err.Error())
 		}
 
-		return orz.Respond(c, 200, "产品列表（带分类信息）", result)
+		return orz.Ok(c, result)
 	})
 
 	// 多条件查询：活跃产品
@@ -173,7 +173,7 @@ func (a *CleanPagingDemoApp) Configure(app *orz.App) error {
 			return orz.InternalServerError(c, err.Error())
 		}
 
-		return orz.Respond(c, 200, "活跃产品列表（多条件筛选）", result)
+		return orz.Ok(c, result)
 	})
 
 	// 基础查询：原类型产品列表
@@ -186,11 +186,11 @@ func (a *CleanPagingDemoApp) Configure(app *orz.App) error {
 			return orz.InternalServerError(c, err.Error())
 		}
 
-		return orz.Respond(c, 200, "基础产品列表（原类型）", result)
+		return orz.Ok(c, result)
 	})
 
 	e.GET("/", func(c echo.Context) error {
-		return orz.Respond(c, 200, "清洁分页查询示例 - 无modifier的PageBuilder", map[string]interface{}{
+		return orz.Ok(c, map[string]interface{}{
 			"description": "展示移除modifier后更清晰的API设计",
 			"endpoints": []string{
 				"GET /products?keyword=iPhone&status=active - 连表查询（带搜索和状态筛选）",

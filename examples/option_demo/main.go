@@ -35,7 +35,7 @@ func (a *OptionDemoApp) Configure(app *orz.App) error {
 	e := app.GetEcho()
 
 	e.GET("/", func(c echo.Context) error {
-		return orz.Respond(c, 200, "Option Demo - Hello from ORZ!", nil)
+		return orz.Message(c, 200, "Option Demo - Hello from ORZ!")
 	})
 
 	e.GET("/users", func(c echo.Context) error {
