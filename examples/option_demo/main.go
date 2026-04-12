@@ -2,9 +2,9 @@ package main
 
 import (
 	"log"
-	"net/http"
 
 	"github.com/go-orz/orz"
+	_ "github.com/go-orz/orz/drivers/sqlite"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )
@@ -35,19 +35,15 @@ func (a *OptionDemoApp) Configure(app *orz.App) error {
 	e := app.GetEcho()
 
 	e.GET("/", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{
-			"message": "Option Demo - Hello from ORZ!",
-		})
+		return orz.Respond(c, 200, "Option Demo - Hello from ORZ!", nil)
 	})
 
 	e.GET("/users", func(c echo.Context) error {
 		var users []User
 		if err := db.Find(&users).Error; err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": err.Error(),
-			})
+			return orz.InternalServerError(c, err.Error())
 		}
-		return c.JSON(http.StatusOK, users)
+		return orz.Ok(c, users)
 	})
 
 	return nil

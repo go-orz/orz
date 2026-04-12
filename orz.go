@@ -12,8 +12,23 @@ type Map = map[string]any
 
 // Framework 框架结构
 type Framework struct {
-	app *App
+	app            *App
+	configLoaders  []func(*App) error
+	loggerMode     loggerMode
+	customLogger   *zap.Logger
+	enableDatabase bool
+	enableHTTP     bool
+	application    Application
+	applicationSet bool
 }
+
+type loggerMode uint8
+
+const (
+	loggerModeUnset loggerMode = iota
+	loggerModeCustom
+	loggerModeFromConfig
+)
 
 // Option 框架配置选项
 type Option func(*Framework) error
@@ -21,9 +36,12 @@ type Option func(*Framework) error
 // WithConfig 设置配置文件路径
 func WithConfig(configPath string) Option {
 	return func(f *Framework) error {
-		if err := f.app.LoadConfigFromFile(configPath); err != nil {
-			return fmt.Errorf("load config failed: %w", err)
-		}
+		f.configLoaders = append(f.configLoaders, func(app *App) error {
+			if err := app.LoadConfigFromFile(configPath); err != nil {
+				return fmt.Errorf("load config failed: %w", err)
+			}
+			return nil
+		})
 		return nil
 	}
 }
@@ -31,9 +49,12 @@ func WithConfig(configPath string) Option {
 // WithConfigBytes 从字节数据设置配置
 func WithConfigBytes(data []byte) Option {
 	return func(f *Framework) error {
-		if err := f.app.LoadConfigFromBytes(data); err != nil {
-			return fmt.Errorf("load config from bytes failed: %w", err)
-		}
+		f.configLoaders = append(f.configLoaders, func(app *App) error {
+			if err := app.LoadConfigFromBytes(data); err != nil {
+				return fmt.Errorf("load config from bytes failed: %w", err)
+			}
+			return nil
+		})
 		return nil
 	}
 }
@@ -41,9 +62,12 @@ func WithConfigBytes(data []byte) Option {
 // WithConfigMap 从 map 设置配置
 func WithConfigMap(configMap map[string]interface{}) Option {
 	return func(f *Framework) error {
-		if err := f.app.LoadConfigFromMap(configMap); err != nil {
-			return fmt.Errorf("load config from map failed: %w", err)
-		}
+		f.configLoaders = append(f.configLoaders, func(app *App) error {
+			if err := app.LoadConfigFromMap(configMap); err != nil {
+				return fmt.Errorf("load config from map failed: %w", err)
+			}
+			return nil
+		})
 		return nil
 	}
 }
@@ -51,7 +75,8 @@ func WithConfigMap(configMap map[string]interface{}) Option {
 // WithLogger 设置日志器
 func WithLogger(logger *zap.Logger) Option {
 	return func(f *Framework) error {
-		f.app.SetLogger(logger)
+		f.loggerMode = loggerModeCustom
+		f.customLogger = logger
 		return nil
 	}
 }
@@ -59,9 +84,7 @@ func WithLogger(logger *zap.Logger) Option {
 // WithLoggerFromConfig 根据配置启用日志器
 func WithLoggerFromConfig() Option {
 	return func(f *Framework) error {
-		if err := f.app.EnableLogger(); err != nil {
-			return err
-		}
+		f.loggerMode = loggerModeFromConfig
 		return nil
 	}
 }
@@ -69,9 +92,7 @@ func WithLoggerFromConfig() Option {
 // WithDatabase 启用数据库
 func WithDatabase() Option {
 	return func(f *Framework) error {
-		if err := f.app.EnableDatabase(); err != nil {
-			return err
-		}
+		f.enableDatabase = true
 		return nil
 	}
 }
@@ -79,7 +100,7 @@ func WithDatabase() Option {
 // WithHTTP 启用HTTP服务
 func WithHTTP() Option {
 	return func(f *Framework) error {
-		f.app.EnableHTTP()
+		f.enableHTTP = true
 		return nil
 	}
 }
@@ -87,9 +108,8 @@ func WithHTTP() Option {
 // WithApplication 设置应用实现
 func WithApplication(application Application) Option {
 	return func(f *Framework) error {
-		if err := application.Configure(f.app); err != nil {
-			return fmt.Errorf("failed to configure application: %w", err)
-		}
+		f.application = application
+		f.applicationSet = true
 		return nil
 	}
 }
@@ -107,7 +127,46 @@ func NewFramework(options ...Option) (*Framework, error) {
 		}
 	}
 
+	if err := framework.initialize(); err != nil {
+		return nil, err
+	}
+
 	return framework, nil
+}
+
+func (f *Framework) initialize() error {
+	for _, loader := range f.configLoaders {
+		if err := loader(f.app); err != nil {
+			return err
+		}
+	}
+
+	switch f.loggerMode {
+	case loggerModeCustom:
+		f.app.SetLogger(f.customLogger)
+	case loggerModeFromConfig:
+		if err := f.app.EnableLogger(); err != nil {
+			return err
+		}
+	}
+
+	if f.enableDatabase {
+		if err := f.app.EnableDatabase(); err != nil {
+			return err
+		}
+	}
+
+	if f.enableHTTP {
+		f.app.EnableHTTP()
+	}
+
+	if f.applicationSet && f.application != nil {
+		if err := f.application.Configure(f.app); err != nil {
+			return fmt.Errorf("failed to configure application: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // Run 运行应用

@@ -1,16 +1,15 @@
-module option-demo
+module pagebuilder-integration-test
 
 go 1.25.0
 
-replace github.com/go-orz/orz => ../../
+replace github.com/go-orz/orz => ../..
 
 replace github.com/go-orz/orz/drivers/sqlite => ../../drivers/sqlite
 
 require (
 	github.com/go-orz/orz v0.2.11
 	github.com/go-orz/orz/drivers/sqlite v0.0.0-00010101000000-000000000000
-	github.com/labstack/echo/v4 v4.15.1
-	go.uber.org/zap v1.27.1
+	gorm.io/gorm v1.31.1
 )
 
 require (
@@ -23,6 +22,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/labstack/echo/v4 v4.15.1 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.21 // indirect
@@ -38,13 +38,13 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.50.0 // indirect
 	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	gorm.io/gorm v1.31.1 // indirect
 	modernc.org/libc v1.72.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect

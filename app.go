@@ -2,11 +2,13 @@ package orz
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
-	"os"
+	"net/http"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -78,15 +80,8 @@ func (a *App) EnableHTTP() {
 	// 应用服务器配置
 	config := a.GetConfig()
 	if config != nil {
-		// 配置信任的IP列表
 		ipTrustList := config.Server.IPTrustList
-		if len(ipTrustList) == 0 {
-			// 这里可以添加IP白名单中间件的逻辑
-			ipTrustList = []string{"0.0.0.0/0"}
-		}
-		a.Logger().Info("IP trust list configured", zap.Strings("trustedIPs", ipTrustList))
-
-		var options = make([]echo.TrustOption, 0, len(ipTrustList))
+		options := make([]echo.TrustOption, 0, len(ipTrustList))
 		for _, ip := range ipTrustList {
 			_, ipNet, err := net.ParseCIDR(ip)
 			if err != nil {
@@ -95,16 +90,41 @@ func (a *App) EnableHTTP() {
 			}
 			options = append(options, echo.TrustIPRange(ipNet))
 		}
-		// 配置IP提取器
-		ipExtractor := strings.ToLower(config.Server.IPExtractor)
+
+		if len(options) > 0 {
+			a.Logger().Info("IP trust list configured", zap.Strings("trustedIPs", ipTrustList))
+		}
+
+		ipExtractor := strings.ToLower(strings.TrimSpace(config.Server.IPExtractor))
+		if ipExtractor == "" {
+			ipExtractor = "direct"
+		}
+
 		switch ipExtractor {
 		case "x-forwarded-for":
+			if len(options) == 0 {
+				a.Logger().Warn("x-forwarded-for extractor requested without trusted proxies; falling back to direct")
+				e.IPExtractor = echo.ExtractIPDirect()
+				break
+			}
 			e.IPExtractor = echo.ExtractIPFromXFFHeader(options...)
 		case "x-real-ip":
+			if len(options) == 0 {
+				a.Logger().Warn("x-real-ip extractor requested without trusted proxies; falling back to direct")
+				e.IPExtractor = echo.ExtractIPDirect()
+				break
+			}
 			e.IPExtractor = echo.ExtractIPFromRealIPHeader(options...)
 		case "direct":
 			e.IPExtractor = echo.ExtractIPDirect()
+		default:
+			a.Logger().Warn("unknown IP extractor; falling back to direct", zap.String("ipExtractor", config.Server.IPExtractor))
+			e.IPExtractor = echo.ExtractIPDirect()
 		}
+	}
+
+	if e.IPExtractor == nil {
+		e.IPExtractor = echo.ExtractIPDirect()
 	}
 
 	a.SetEcho(e)
@@ -175,7 +195,7 @@ func (a *App) Run() error {
 	e := a.GetEcho()
 	if e == nil {
 		a.Logger().Info("no HTTP server configured, running in daemon mode")
-		return nil
+		return a.runDaemon()
 	}
 
 	// 启动HTTP服务器
@@ -184,19 +204,33 @@ func (a *App) Run() error {
 
 // runHTTPServer 运行HTTP服务器
 func (a *App) runHTTPServer(e *echo.Echo) error {
-	// 优雅关闭
+	signalCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopSignals()
+
+	watchCtx, stopWatch := context.WithCancel(context.Background())
+	defer stopWatch()
+
+	var shutdownOnce sync.Once
+	shutdown := func() {
+		shutdownOnce.Do(func() {
+			a.Logger().Info("shutting down server...")
+			a.cancel()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := e.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				a.Logger().Error("server forced to shutdown", zap.Error(err))
+			}
+		})
+	}
+
 	go func() {
-		quit := make(chan os.Signal, 1)
-		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-		<-quit
-
-		a.Logger().Info("shutting down server...")
-		a.cancel()
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := e.Shutdown(ctx); err != nil {
-			a.Logger().Error("server forced to shutdown", zap.Error(err))
+		select {
+		case <-signalCtx.Done():
+			shutdown()
+		case <-a.ctx.Done():
+			shutdown()
+		case <-watchCtx.Done():
 		}
 	}()
 
@@ -210,29 +244,31 @@ func (a *App) runHTTPServer(e *echo.Echo) error {
 	a.Logger().Info("starting server", zap.String("addr", addr))
 
 	// 根据配置启动HTTP或HTTPS服务器
+	var err error
 	if config != nil && config.Server.TLS.Enabled {
 		if config.Server.TLS.Auto {
 			a.Logger().Info("starting HTTPS server with auto TLSConfig")
-			if err := e.StartAutoTLS(addr); err != nil {
-				a.Logger().Info("server stopped")
-			}
+			err = e.StartAutoTLS(addr)
 		} else if config.Server.TLS.Cert != "" && config.Server.TLS.Key != "" {
 			a.Logger().Info("starting HTTPS server with custom TLSConfig",
 				zap.String("cert", config.Server.TLS.Cert),
 				zap.String("key", config.Server.TLS.Key))
-			if err := e.StartTLS(addr, config.Server.TLS.Cert, config.Server.TLS.Key); err != nil {
-				a.Logger().Info("server stopped")
-			}
+			err = e.StartTLS(addr, config.Server.TLS.Cert, config.Server.TLS.Key)
 		} else {
 			a.Logger().Error("TLSConfig enabled but cert/key not provided, falling back to HTTP")
-			if err := e.Start(addr); err != nil {
-				a.Logger().Info("server stopped")
-			}
+			err = e.Start(addr)
 		}
 	} else {
-		if err := e.Start(addr); err != nil {
+		err = e.Start(addr)
+	}
+
+	stopWatch()
+	if err != nil {
+		if errors.Is(err, http.ErrServerClosed) {
 			a.Logger().Info("server stopped")
+			return nil
 		}
+		return err
 	}
 
 	return nil
@@ -242,12 +278,16 @@ func (a *App) runHTTPServer(e *echo.Echo) error {
 func (a *App) runDaemon() error {
 	a.Logger().Info("running in daemon mode")
 
-	// 等待信号
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	signalCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopSignals()
 
-	a.Logger().Info("shutting down daemon...")
-	a.cancel()
+	select {
+	case <-signalCtx.Done():
+		a.Logger().Info("shutting down daemon...")
+		a.cancel()
+	case <-a.ctx.Done():
+		a.Logger().Info("shutting down daemon...")
+	}
+
 	return nil
 }

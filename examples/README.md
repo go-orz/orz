@@ -2,11 +2,14 @@
 
 本目录包含 ORZ 框架的核心使用示例，展示框架的主要功能。
 
+所有示例都按需引入数据库驱动子模块，不会因为使用框架核心包而默认携带全部数据库驱动。
+
 ## 📁 示例目录
 
 ### 1. `simple/` - 基础使用示例
 展示 ORZ 框架最简单的使用方式：
 - 快速启动方式 (`orz.Quick`)
+- 按需引入数据库驱动（示例里使用 SQLite）
 - 基本的 HTTP 路由设置
 - 数据库模型和 CRUD 操作
 - 适合初学者快速上手
@@ -31,8 +34,8 @@ cd service_demo
 go run main.go
 ```
 
-### 3. `improved_paging_demo/` - 安全分页演示
-展示 ORZ 框架的高级分页功能和安全特性：
+### 3. `advanced_paging_demo/` - 高级分页演示
+展示 ORZ 框架的高级分页功能：
 - 安全的排序字段白名单验证
 - SQL 注入防护演示
 - 链式 API 调用
@@ -41,9 +44,15 @@ go run main.go
 
 **运行方式：**
 ```bash
-cd improved_paging_demo
+cd advanced_paging_demo
 go run main.go
 ```
+
+### 4. `clean_paging_demo/` - 精简分页演示
+展示更直接的分页查询 API：
+- 连表分页查询
+- 多条件筛选
+- 原类型和视图类型查询
 
 ## 🚀 快速开始
 
@@ -61,8 +70,11 @@ go run main.go
    # Service 示例
    cd service_demo && go run main.go
    
-   # 分页示例
-   cd improved_paging_demo && go run main.go
+   # 高级分页示例
+   cd advanced_paging_demo && go run main.go
+
+   # 精简分页示例
+   cd clean_paging_demo && go run main.go
    ```
 
 ## 📚 学习路径
@@ -71,7 +83,8 @@ go run main.go
 
 1. **`simple`** - 了解框架基础用法
 2. **`service_demo`** - 学习业务层设计和事务管理
-3. **`improved_paging_demo`** - 掌握高级查询和安全特性
+3. **`advanced_paging_demo`** - 掌握高级查询和视图查询
+4. **`clean_paging_demo`** - 对比更精简的分页 API
 
 每个示例都包含详细的注释和说明，帮助理解 ORZ 框架的设计理念和最佳实践。
 

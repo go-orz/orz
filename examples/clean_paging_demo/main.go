@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 
 	"github.com/go-orz/orz"
+	_ "github.com/go-orz/orz/drivers/sqlite"
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
 )
@@ -57,8 +57,8 @@ func NewProductRepo(db *gorm.DB) *ProductRepo {
 // PageWithCategory 查询带分类信息的产品列表
 func (r *ProductRepo) PageWithCategory(ctx context.Context, pageIndex, pageSize int, nameKeyword, status string) (*orz.PageResult[ProductListView], error) {
 	builder := orz.Query(r.Repository).
-		Index(pageIndex).
-		Size(pageSize).
+		PageIndex(pageIndex).
+		PageSize(pageSize).
 		Select("products.*, categories.name as category_name").
 		LeftJoin("categories", "products.category_id = categories.id").
 		SortByDesc("id", "id", "name", "price")
@@ -79,17 +79,17 @@ func (r *ProductRepo) PageWithCategory(ctx context.Context, pageIndex, pageSize 
 // PageActiveProducts 查询活跃产品（多条件示例）
 func (r *ProductRepo) PageActiveProducts(ctx context.Context, pageIndex, pageSize int, categories []uint) (*orz.PageResult[ProductListView], error) {
 	builder := orz.Query(r.Repository).
-		Index(pageIndex).
-		Size(pageSize).
+		PageIndex(pageIndex).
+		PageSize(pageSize).
 		Select("products.*, categories.name as category_name").
 		LeftJoin("categories", "products.category_id = categories.id").
-		Equal("products.status", "active").     // 只查询活跃产品
-		NotEqual("products.price", 0).          // 排除免费产品
-		SortBy("products.price", "price", "id") // 按价格升序
+		Equal("status", "active"). // 只查询活跃产品
+		NotEqual("price", 0).      // 排除免费产品
+		SortBy("price", "price", "id")
 
 	// 可选：按分类筛选
 	if len(categories) > 0 {
-		builder = builder.In("products.category_id", categories)
+		builder = builder.In("categoryId", categories)
 	}
 
 	return orz.ExecuteAsTyped[ProductListView](ctx, builder)
@@ -98,8 +98,8 @@ func (r *ProductRepo) PageActiveProducts(ctx context.Context, pageIndex, pageSiz
 // PageBasicProducts 基础产品查询（原类型）
 func (r *ProductRepo) PageBasicProducts(ctx context.Context, pageIndex, pageSize int, priceRange []int) (*orz.PageResult[Product], error) {
 	builder := orz.Query(r.Repository).
-		Index(pageIndex).
-		Size(pageSize).
+		PageIndex(pageIndex).
+		PageSize(pageSize).
 		SortByDesc("id", "id", "name", "price")
 
 	// 价格范围筛选
@@ -117,11 +117,7 @@ type CleanPagingDemoApp struct{}
 
 func (a *CleanPagingDemoApp) Configure(app *orz.App) error {
 	// 获取数据库并自动迁移
-	db, err := app.GetDatabase()
-	if err != nil {
-		return err
-	}
-
+	db := app.GetDatabase()
 	if err := db.AutoMigrate(&Product{}, &Category{}); err != nil {
 		return err
 	}
@@ -145,10 +141,7 @@ func (a *CleanPagingDemoApp) Configure(app *orz.App) error {
 	db.Create(&products)
 
 	// 获取Echo并设置路由
-	e, err := app.GetEcho()
-	if err != nil {
-		return err
-	}
+	e := app.GetEcho()
 
 	// 创建仓库
 	productRepo := NewProductRepo(db)
@@ -162,15 +155,10 @@ func (a *CleanPagingDemoApp) Configure(app *orz.App) error {
 
 		result, err := productRepo.PageWithCategory(c.Request().Context(), pageIndex, pageSize, keyword, status)
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": err.Error(),
-			})
+			return orz.InternalServerError(c, err.Error())
 		}
 
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"message": "产品列表（带分类信息）",
-			"data":    result,
-		})
+		return orz.Respond(c, 200, "产品列表（带分类信息）", result)
 	})
 
 	// 多条件查询：活跃产品
@@ -182,15 +170,10 @@ func (a *CleanPagingDemoApp) Configure(app *orz.App) error {
 
 		result, err := productRepo.PageActiveProducts(c.Request().Context(), pageIndex, pageSize, categories)
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": err.Error(),
-			})
+			return orz.InternalServerError(c, err.Error())
 		}
 
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"message": "活跃产品列表（多条件筛选）",
-			"data":    result,
-		})
+		return orz.Respond(c, 200, "活跃产品列表（多条件筛选）", result)
 	})
 
 	// 基础查询：原类型产品列表
@@ -200,20 +183,14 @@ func (a *CleanPagingDemoApp) Configure(app *orz.App) error {
 
 		result, err := productRepo.PageBasicProducts(c.Request().Context(), pageIndex, pageSize, nil)
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": err.Error(),
-			})
+			return orz.InternalServerError(c, err.Error())
 		}
 
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"message": "基础产品列表（原类型）",
-			"data":    result,
-		})
+		return orz.Respond(c, 200, "基础产品列表（原类型）", result)
 	})
 
 	e.GET("/", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"message":     "清洁分页查询示例 - 无modifier的PageBuilder",
+		return orz.Respond(c, 200, "清洁分页查询示例 - 无modifier的PageBuilder", map[string]interface{}{
 			"description": "展示移除modifier后更清晰的API设计",
 			"endpoints": []string{
 				"GET /products?keyword=iPhone&status=active - 连表查询（带搜索和状态筛选）",

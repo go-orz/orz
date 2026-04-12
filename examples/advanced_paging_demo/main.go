@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 
 	"github.com/go-orz/orz"
+	_ "github.com/go-orz/orz/drivers/sqlite"
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
 )
@@ -126,15 +126,10 @@ func (a *AdvancedPagingDemoApp) Configure(app *orz.App) error {
 
 		result, err := licenseRepo.PageWithCreator(c.Request().Context(), pageIndex, pageSize, keyword)
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": err.Error(),
-			})
+			return orz.InternalServerError(c, err.Error())
 		}
 
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"message": "许可证列表（带创建者信息）",
-			"data":    result,
-		})
+		return orz.Respond(c, 200, "许可证列表（带创建者信息）", result)
 	})
 
 	// 基础查询：原类型的许可证列表
@@ -145,20 +140,14 @@ func (a *AdvancedPagingDemoApp) Configure(app *orz.App) error {
 
 		result, err := licenseRepo.PageBasic(c.Request().Context(), pageIndex, pageSize, typeFilter)
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{
-				"error": err.Error(),
-			})
+			return orz.InternalServerError(c, err.Error())
 		}
 
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"message": "基础许可证列表",
-			"data":    result,
-		})
+		return orz.Respond(c, 200, "基础许可证列表", result)
 	})
 
 	e.GET("/", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"message":     "分页查询示例 - PageBuilder",
+		return orz.Respond(c, 200, "分页查询示例 - PageBuilder", map[string]interface{}{
 			"description": "使用优雅的PageBuilder进行分页查询",
 			"endpoints": []string{
 				"GET /licenses?keyword=MIT - 连表查询（带创建者信息）",

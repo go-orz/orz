@@ -177,46 +177,28 @@ func (b *PageBuilder[T, ID]) Select(fields string) *PageBuilder[T, ID] {
 
 // Execute 执行分页查询（返回原类型）
 func (b *PageBuilder[T, ID]) Execute(ctx context.Context) (*PageResult[T], error) {
-	db := b.repo.GetDB(ctx)
-
-	// 验证排序字段安全性
 	if err := b.sort.Validate(); err != nil {
 		return nil, fmt.Errorf("sort validation failed: %w", err)
 	}
 
-	// 应用 SELECT 字段
-	if b.selectSQL != "" {
-		db = db.Select(b.selectSQL)
-	}
-
-	// 应用 JOIN 语句
-	for _, join := range b.joins {
-		db = db.Joins(join)
-	}
-
-	// 应用查询匹配器和关键词匹配器
-	var err error
-	db, err = ApplyMatchersWithKeyword(db, b.matchers, b.keywordMatcher, b.repo.GetTableName(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("apply matchers failed: %w", err)
-	}
-
-	// 应用排序
-	if !b.sort.IsEmpty() {
-		db = db.Order(fmt.Sprintf("%s %s", b.sort.Field, b.sort.Order))
-	}
-
 	// 查询总数
 	var total int64
-	countDB := db.Session(&gorm.Session{})
-	if err := countDB.Table(b.repo.GetTableName()).Count(&total).Error; err != nil {
+	countDB, err := b.buildCountQuery(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := countDB.Count(&total).Error; err != nil {
 		return nil, fmt.Errorf("count failed: %w", err)
 	}
 
 	// 查询数据
 	var items []T
-	dataDB := db.Offset((b.pageIndex - 1) * b.pageSize).Limit(b.pageSize)
-	if err := dataDB.Table(b.repo.GetTableName()).Find(&items).Error; err != nil {
+	dataDB, err := b.buildDataQuery(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dataDB = dataDB.Offset((b.pageIndex - 1) * b.pageSize).Limit(b.pageSize)
+	if err := dataDB.Find(&items).Error; err != nil {
 		return nil, fmt.Errorf("find page items failed: %w", err)
 	}
 
@@ -229,46 +211,28 @@ func (b *PageBuilder[T, ID]) Execute(ctx context.Context) (*PageResult[T], error
 // ExecuteAsTyped 执行泛型分页查询（返回强类型结果）
 // 这个方法通过直接操作数据库来实现不同类型的查询
 func ExecuteAsTyped[R any, T any, ID comparable](ctx context.Context, builder *PageBuilder[T, ID]) (*PageResult[R], error) {
-	db := builder.repo.GetDB(ctx)
-
-	// 验证排序字段安全性
 	if err := builder.sort.Validate(); err != nil {
 		return nil, fmt.Errorf("sort validation failed: %w", err)
 	}
 
-	// 应用 SELECT 字段
-	if builder.selectSQL != "" {
-		db = db.Select(builder.selectSQL)
-	}
-
-	// 应用 JOIN 语句
-	for _, join := range builder.joins {
-		db = db.Joins(join)
-	}
-
-	// 应用查询匹配器和关键词匹配器
-	var err error
-	db, err = ApplyMatchersWithKeyword(db, builder.matchers, builder.keywordMatcher, builder.repo.GetTableName(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("apply matchers failed: %w", err)
-	}
-
-	// 应用排序
-	if !builder.sort.IsEmpty() {
-		db = db.Order(fmt.Sprintf("%s %s", builder.sort.Field, builder.sort.Order))
-	}
-
 	// 查询总数
 	var total int64
-	countDB := db.Session(&gorm.Session{})
-	if err := countDB.Table(builder.repo.GetTableName()).Count(&total).Error; err != nil {
+	countDB, err := builder.buildCountQuery(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := countDB.Count(&total).Error; err != nil {
 		return nil, fmt.Errorf("count failed: %w", err)
 	}
 
 	// 查询数据
 	var items []R
-	dataDB := db.Offset((builder.pageIndex - 1) * builder.pageSize).Limit(builder.pageSize)
-	if err := dataDB.Table(builder.repo.GetTableName()).Find(&items).Error; err != nil {
+	dataDB, err := builder.buildDataQuery(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dataDB = dataDB.Offset((builder.pageIndex - 1) * builder.pageSize).Limit(builder.pageSize)
+	if err := dataDB.Find(&items).Error; err != nil {
 		return nil, fmt.Errorf("find page items failed: %w", err)
 	}
 
@@ -276,6 +240,56 @@ func ExecuteAsTyped[R any, T any, ID comparable](ctx context.Context, builder *P
 		Items: items,
 		Total: total,
 	}, nil
+}
+
+func (b *PageBuilder[T, ID]) buildBaseQuery(ctx context.Context) (*gorm.DB, error) {
+	db := b.repo.GetDB(ctx).Table(b.repo.GetTableName())
+
+	for _, join := range b.joins {
+		db = db.Joins(join)
+	}
+
+	var err error
+	db, err = ApplyMatchersWithKeyword(db, b.matchers, b.keywordMatcher, b.repo.GetTableName(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("apply matchers failed: %w", err)
+	}
+
+	return db, nil
+}
+
+func (b *PageBuilder[T, ID]) buildCountQuery(ctx context.Context) (*gorm.DB, error) {
+	db, err := b.buildBaseQuery(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(b.joins) > 0 {
+		db = db.Distinct(fmt.Sprintf("%s.id", b.repo.GetTableName()))
+	}
+
+	return db, nil
+}
+
+func (b *PageBuilder[T, ID]) buildDataQuery(ctx context.Context) (*gorm.DB, error) {
+	db, err := b.buildBaseQuery(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if b.selectSQL != "" {
+		db = db.Select(b.selectSQL)
+	}
+
+	if !b.sort.IsEmpty() {
+		orderClause, err := b.sort.OrderClause(b.repo.GetTableName())
+		if err != nil {
+			return nil, fmt.Errorf("sort validation failed: %w", err)
+		}
+		db = db.Order(orderClause)
+	}
+
+	return db, nil
 }
 
 // 便捷的链式查询方法

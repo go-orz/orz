@@ -2,15 +2,17 @@ package orz
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/cast"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/schema"
 )
 
 // Repository 通用仓库接口
@@ -53,6 +55,11 @@ const (
 	DESC SortOrder = "desc" // 倒序
 )
 
+var (
+	defaultNamingStrategy = schema.NamingStrategy{}
+	sqlIdentifierPattern  = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+)
+
 // Sort 排序配置
 type Sort struct {
 	Order         SortOrder // 排序方式
@@ -68,9 +75,8 @@ func NewSort(order SortOrder, field string, allowedFields ...string) Sort {
 	}
 	return Sort{
 		Order:         order,
-		Field:         CamelToSnake(field),     // 自动转换为蛇形命名
-		AllowedFields: allowedFields,           // 允许排序的字段白名单
-		validated:     len(allowedFields) == 0, // 如果没有白名单则默认为有效
+		Field:         CamelToSnake(field),
+		AllowedFields: allowedFields,
 	}
 }
 
@@ -102,7 +108,7 @@ func (s *Sort) IsValid() bool {
 	// 检查原始字段名和蛇形字段名
 	originalProperty := s.Field
 	for _, field := range s.AllowedFields {
-		if field == originalProperty || CamelToSnake(field) == originalProperty {
+		if CamelToSnake(field) == originalProperty {
 			return true
 		}
 	}
@@ -124,6 +130,36 @@ func (s *Sort) Validate() error {
 
 	s.validated = true
 	return nil
+}
+
+func (s *Sort) OrderClause(tableName string) (string, error) {
+	field, err := s.QualifiedField(tableName)
+	if err != nil {
+		return "", err
+	}
+
+	order := strings.ToUpper(string(s.Order))
+	if order == "" {
+		order = strings.ToUpper(string(DESC))
+	}
+	if order != "ASC" && order != "DESC" {
+		return "", fmt.Errorf("invalid sort order %q", s.Order)
+	}
+
+	return fmt.Sprintf("%s %s", field, order), nil
+}
+
+func (s *Sort) QualifiedField(tableName string) (string, error) {
+	field := CamelToSnake(s.Field)
+	if field == "" {
+		return "", nil
+	}
+
+	if !strings.Contains(field, ".") && tableName != "" {
+		field = fmt.Sprintf("%s.%s", CamelToSnake(tableName), field)
+	}
+
+	return normalizeSQLName(field)
 }
 
 // PageResult 分页结果
@@ -214,18 +250,11 @@ func CamelToSnake(s string) string {
 		return ""
 	}
 
-	var result []byte
-	for i, r := range s {
-		if i > 0 && 'A' <= r && r <= 'Z' {
-			result = append(result, '_')
-		}
-		if 'A' <= r && r <= 'Z' {
-			result = append(result, byte(r+'a'-'A'))
-		} else {
-			result = append(result, byte(r))
-		}
+	parts := strings.Split(s, ".")
+	for i, part := range parts {
+		parts[i] = defaultNamingStrategy.ColumnName("", part)
 	}
-	return string(result)
+	return strings.Join(parts, ".")
 }
 
 // BaseRepository 基础仓库实现
@@ -250,16 +279,26 @@ func NewRepositoryWithGetter[T any, ID comparable](getDB func(ctx context.Contex
 }
 
 // NewRepositoryFromApp 从应用容器创建仓库实例
-func NewRepositoryFromApp[T any, ID comparable](app interface {
-	GetDatabase() (*gorm.DB, error)
-	GetConfig() *Config
-}) (Repository[T, ID], error) {
-	db, err := app.GetDatabase()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get database from app: %w", err)
+func NewRepositoryFromApp[T any, ID comparable](app any) (Repository[T, ID], error) {
+	switch a := app.(type) {
+	case interface{ GetDatabase() *gorm.DB }:
+		db := a.GetDatabase()
+		if db == nil {
+			return nil, fmt.Errorf("failed to get database from app: database is nil")
+		}
+		return NewRepository[T, ID](db), nil
+	case interface{ GetDatabase() (*gorm.DB, error) }:
+		db, err := a.GetDatabase()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get database from app: %w", err)
+		}
+		if db == nil {
+			return nil, fmt.Errorf("failed to get database from app: database is nil")
+		}
+		return NewRepository[T, ID](db), nil
+	default:
+		return nil, fmt.Errorf("app does not implement supported GetDatabase method")
 	}
-	repo := NewRepository[T, ID](db)
-	return repo, nil
 }
 
 // GetDB 获取数据库实例
@@ -295,7 +334,7 @@ func (r *BaseRepository[T, ID]) GetTableName() string {
 
 		// 如果没有 TableName 方法，使用类型名的复数形式
 		if r.tableName == "" {
-			r.tableName = CamelToSnake(typeOf.Name()) + "s"
+			r.tableName = defaultNamingStrategy.TableName(typeOf.Name())
 		}
 	}
 	return r.tableName
@@ -371,13 +410,17 @@ func (r *BaseRepository[T, ID]) ExistsById(ctx context.Context, id ID) (bool, er
 // UpdateById 根据ID更新实体
 func (r *BaseRepository[T, ID]) UpdateById(ctx context.Context, entity *T) error {
 	db := r.GetDB(ctx)
-	return db.Table(r.GetTableName()).Updates(entity).Error
+	id, err := entityIDValue(entity)
+	if err != nil {
+		return err
+	}
+	return db.Table(r.GetTableName()).Where("id = ?", id).Updates(entity).Error
 }
 
 // UpdateColumnsById 根据ID更新指定列
 func (r *BaseRepository[T, ID]) UpdateColumnsById(ctx context.Context, id ID, columns map[string]interface{}) error {
 	db := r.GetDB(ctx)
-	return db.Table(r.GetTableName()).Where("id", id).UpdateColumns(columns).Error
+	return db.Table(r.GetTableName()).Where("id = ?", id).UpdateColumns(columns).Error
 }
 
 // Save 保存实体（包含零值）
@@ -423,8 +466,11 @@ func (r *BaseRepository[T, ID]) Find(ctx context.Context, matchers []Matcher, so
 	}
 
 	if !sort.IsEmpty() {
-		// 使用安全的字段名（已通过白名单验证）
-		db = db.Order(fmt.Sprintf(`%s %s`, r.wrap(sort.Field), sort.Order))
+		orderClause, err := sortCopy.OrderClause(r.GetTableName())
+		if err != nil {
+			return nil, fmt.Errorf("sort validation failed: %w", err)
+		}
+		db = db.Order(orderClause)
 	}
 
 	err = db.Table(r.GetTableName()).Find(&items).Error
@@ -433,15 +479,16 @@ func (r *BaseRepository[T, ID]) Find(ctx context.Context, matchers []Matcher, so
 
 // wrap 包装字段名为表名.字段名格式
 func (r *BaseRepository[T, ID]) wrap(property string) string {
+	property = CamelToSnake(property)
+	if strings.Contains(property, ".") {
+		return property
+	}
 	return fmt.Sprintf("%s.%s", r.GetTableName(), property)
 }
 
 // wrapQuery 包装查询字段名
-func (r *BaseRepository[T, ID]) wrapQuery(m Matcher) string {
-	if m.CustomTable {
-		return m.SnakeName()
-	}
-	return fmt.Sprintf("%s.%s", r.GetTableName(), m.SnakeName())
+func (r *BaseRepository[T, ID]) wrapQuery(m Matcher) (string, error) {
+	return qualifyQueryField(m.Name, r.GetTableName(), m.CustomTable)
 }
 
 // likeValue 包装LIKE查询的值
@@ -467,11 +514,9 @@ func ApplyKeywordMatcher(db *gorm.DB, keywordMatcher *KeywordMatcher, tableName 
 	var exprList = make([]clause.Expression, 0, len(keywordMatcher.Names))
 
 	for _, name := range keywordMatcher.Names {
-		var field string
-		if keywordMatcher.CustomTable {
-			field = CamelToSnake(name)
-		} else {
-			field = fmt.Sprintf("%s.%s", tableName, CamelToSnake(name))
+		field, err := qualifyQueryField(name, tableName, keywordMatcher.CustomTable)
+		if err != nil {
+			return nil, fmt.Errorf("invalid keyword field %q: %w", name, err)
 		}
 
 		switch databaseType {
@@ -496,7 +541,7 @@ func ApplyKeywordMatcher(db *gorm.DB, keywordMatcher *KeywordMatcher, tableName 
 }
 
 // ApplyMatchersWithKeyword 应用匹配器和关键词匹配器到查询
-func ApplyMatchersWithKeyword(db *gorm.DB, matchers []Matcher, keywordMatcher *KeywordMatcher, tableName string, wrapQueryFunc func(Matcher) string) (*gorm.DB, error) {
+func ApplyMatchersWithKeyword(db *gorm.DB, matchers []Matcher, keywordMatcher *KeywordMatcher, tableName string, wrapQueryFunc func(Matcher) (string, error)) (*gorm.DB, error) {
 	// 先应用普通匹配器
 	var err error
 	db, err = ApplyMatchers(db, matchers, tableName, wrapQueryFunc)
@@ -514,7 +559,7 @@ func ApplyMatchersWithKeyword(db *gorm.DB, matchers []Matcher, keywordMatcher *K
 }
 
 // ApplyMatchers 应用匹配器到查询（独立函数，可被其他地方复用）
-func ApplyMatchers(db *gorm.DB, matchers []Matcher, tableName string, wrapQueryFunc func(Matcher) string) (*gorm.DB, error) {
+func ApplyMatchers(db *gorm.DB, matchers []Matcher, tableName string, wrapQueryFunc func(Matcher) (string, error)) (*gorm.DB, error) {
 	// 使用数据库类型
 	databaseType := DatabaseType(db.Dialector.Name())
 	for _, matcher := range matchers {
@@ -526,17 +571,19 @@ func ApplyMatchers(db *gorm.DB, matchers []Matcher, tableName string, wrapQueryF
 			}
 		}
 
-		var queryField string
+		var (
+			queryField string
+			err        error
+		)
 		if wrapQueryFunc != nil {
-			queryField = wrapQueryFunc(matcher)
+			queryField, err = wrapQueryFunc(matcher)
+			if err != nil {
+				return nil, fmt.Errorf("invalid query field %q: %w", matcher.Name, err)
+			}
 		} else {
-			// 默认处理：如果有自定义表则不加前缀，否则使用表名前缀
-			if matcher.CustomTable {
-				queryField = matcher.SnakeName()
-			} else if tableName != "" {
-				queryField = fmt.Sprintf("%s.%s", tableName, matcher.SnakeName())
-			} else {
-				queryField = matcher.SnakeName()
+			queryField, err = qualifyQueryField(matcher.Name, tableName, matcher.CustomTable)
+			if err != nil {
+				return nil, fmt.Errorf("invalid query field %q: %w", matcher.Name, err)
 			}
 		}
 
@@ -583,9 +630,10 @@ func ApplyMatchers(db *gorm.DB, matchers []Matcher, tableName string, wrapQueryF
 		case MatcherNotIn:
 			db = db.Where(fmt.Sprintf("%s not in ?", queryField), matcher.Value)
 		case MatcherTags:
-			tags := strings.Split(cast.ToString(matcher.Value), ",")
-			for _, tag := range tags {
-				db = db.Where(datatypes.JSONArrayQuery(matcher.SnakeName()).Contains(tag))
+			var err error
+			db, err = applyTagsMatcher(db, databaseType, queryField, cast.ToString(matcher.Value))
+			if err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -595,6 +643,84 @@ func ApplyMatchers(db *gorm.DB, matchers []Matcher, tableName string, wrapQueryF
 // match 处理查询匹配器
 func (r *BaseRepository[T, ID]) match(db *gorm.DB, matchers []Matcher) (*gorm.DB, error) {
 	return ApplyMatchers(db, matchers, r.GetTableName(), r.wrapQuery)
+}
+
+func normalizeSQLName(name string) (string, error) {
+	parts := strings.Split(name, ".")
+	if len(parts) == 0 {
+		return "", fmt.Errorf("empty SQL identifier")
+	}
+
+	for _, part := range parts {
+		if part == "" || !sqlIdentifierPattern.MatchString(part) {
+			return "", fmt.Errorf("invalid SQL identifier %q", name)
+		}
+	}
+
+	return strings.Join(parts, "."), nil
+}
+
+func qualifyQueryField(name, tableName string, customTable bool) (string, error) {
+	field := CamelToSnake(name)
+	if field == "" {
+		return "", fmt.Errorf("empty SQL identifier")
+	}
+
+	if !customTable && !strings.Contains(field, ".") && tableName != "" {
+		field = fmt.Sprintf("%s.%s", CamelToSnake(tableName), field)
+	}
+
+	return normalizeSQLName(field)
+}
+
+func applyTagsMatcher(db *gorm.DB, databaseType DatabaseType, queryField string, value string) (*gorm.DB, error) {
+	tags := strings.Split(value, ",")
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+
+		switch databaseType {
+		case DatabaseMysql:
+			db = db.Where(fmt.Sprintf("JSON_CONTAINS(%s, JSON_ARRAY(?))", queryField), tag)
+		case DatabaseSqlite:
+			db = db.Where(fmt.Sprintf("EXISTS (SELECT 1 FROM json_each(%s) WHERE value = ?)", queryField), tag)
+		case DatabasePostgres, DatabasePostgresql:
+			payload, err := json.Marshal([]string{tag})
+			if err != nil {
+				return nil, fmt.Errorf("marshal tags matcher value failed: %w", err)
+			}
+			db = db.Where(fmt.Sprintf("%s @> ?::jsonb", queryField), string(payload))
+		default:
+			return nil, fmt.Errorf("database type %s not supported for tags search", databaseType)
+		}
+	}
+
+	return db, nil
+}
+
+func entityIDValue(entity any) (any, error) {
+	if entity == nil {
+		return nil, fmt.Errorf("entity is nil")
+	}
+
+	value := reflect.ValueOf(entity)
+	if value.Kind() != reflect.Ptr || value.IsNil() {
+		return nil, fmt.Errorf("entity must be a non-nil pointer")
+	}
+
+	value = value.Elem()
+	if value.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("entity must point to a struct")
+	}
+
+	idField := value.FieldByName("ID")
+	if !idField.IsValid() {
+		return nil, fmt.Errorf("entity does not have ID field")
+	}
+
+	return idField.Interface(), nil
 }
 
 // FindOne 查找单个实体

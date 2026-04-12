@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-orz/orz"
+	_ "github.com/go-orz/orz/drivers/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -182,7 +183,8 @@ func (a *DemoApp) Configure(app *orz.App) error {
 	// 创建用户服务
 	a.userService = NewUserService(db)
 
-	fmt.Println("=== Service 基类使用演示 ===\n")
+	fmt.Println("=== Service 基类使用演示 ===")
+	fmt.Println()
 
 	return a.demonstrateServiceUsage(db)
 }

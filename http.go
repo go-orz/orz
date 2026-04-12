@@ -18,55 +18,47 @@ type Response struct {
 
 // Ok 成功响应
 func Ok(c echo.Context, data interface{}) error {
-	return c.JSON(http.StatusOK, data)
+	return Respond(c, http.StatusOK, "ok", data)
+}
+
+// Created 201成功响应
+func Created(c echo.Context, data interface{}) error {
+	return Respond(c, http.StatusCreated, "created", data)
+}
+
+// Respond 自定义状态码和消息的标准响应
+func Respond(c echo.Context, status int, message string, data interface{}) error {
+	return writeResponse(c, status, message, data)
 }
 
 // ErrorResponse 错误响应
 func ErrorResponse(c echo.Context, code int, message string) error {
-	return c.JSON(http.StatusOK, Response{
-		Code:    code,
-		Message: message,
-	})
+	return Respond(c, code, message, nil)
 }
 
 // BadRequest 400错误
 func BadRequest(c echo.Context, message string) error {
-	return c.JSON(http.StatusBadRequest, Response{
-		Code:    400,
-		Message: message,
-	})
+	return ErrorResponse(c, http.StatusBadRequest, message)
 }
 
 // Unauthorized 401错误
 func Unauthorized(c echo.Context, message string) error {
-	return c.JSON(http.StatusUnauthorized, Response{
-		Code:    401,
-		Message: message,
-	})
+	return ErrorResponse(c, http.StatusUnauthorized, message)
 }
 
 // Forbidden 403错误
 func Forbidden(c echo.Context, message string) error {
-	return c.JSON(http.StatusForbidden, Response{
-		Code:    403,
-		Message: message,
-	})
+	return ErrorResponse(c, http.StatusForbidden, message)
 }
 
 // NotFound 404错误
 func NotFound(c echo.Context, message string) error {
-	return c.JSON(http.StatusNotFound, Response{
-		Code:    404,
-		Message: message,
-	})
+	return ErrorResponse(c, http.StatusNotFound, message)
 }
 
 // InternalServerError 500错误
 func InternalServerError(c echo.Context, message string) error {
-	return c.JSON(http.StatusInternalServerError, Response{
-		Code:    500,
-		Message: message,
-	})
+	return ErrorResponse(c, http.StatusInternalServerError, message)
 }
 
 // PageRequest 分页信息
@@ -183,4 +175,16 @@ func BindAndValidate(c echo.Context, v interface{}) error {
 	}
 
 	return nil
+}
+
+func writeResponse(c echo.Context, status int, message string, data interface{}) error {
+	if message == "" {
+		message = http.StatusText(status)
+	}
+
+	return c.JSON(status, Response{
+		Code:    status,
+		Message: message,
+		Data:    data,
+	})
 }

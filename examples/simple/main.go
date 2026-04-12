@@ -2,11 +2,10 @@ package main
 
 import (
 	"log"
-	"net/http"
 
 	"github.com/go-orz/orz"
+	_ "github.com/go-orz/orz/drivers/sqlite"
 	"github.com/labstack/echo/v4"
-	"gorm.io/gorm"
 )
 
 // User 用户模型示例
@@ -22,7 +21,10 @@ func (User) TableName() string {
 
 func main() {
 	// 快速启动方式
-	err := orz.Quick("config.yaml", func(e *echo.Echo, db *gorm.DB) error {
+	err := orz.Quick("config.yaml", func(app *orz.App) error {
+		db := app.GetDatabase()
+		e := app.GetEcho()
+
 		// 自动迁移
 		if err := db.AutoMigrate(&User{}); err != nil {
 			return err
@@ -30,36 +32,28 @@ func main() {
 
 		// 设置路由
 		e.GET("/", func(c echo.Context) error {
-			return c.JSON(http.StatusOK, map[string]string{
-				"message": "Hello from ORZ framework!",
-			})
+			return orz.Respond(c, 200, "Hello from ORZ framework!", nil)
 		})
 
 		e.GET("/users", func(c echo.Context) error {
 			var users []User
 			if err := db.Find(&users).Error; err != nil {
-				return c.JSON(http.StatusInternalServerError, map[string]string{
-					"error": err.Error(),
-				})
+				return orz.InternalServerError(c, err.Error())
 			}
-			return c.JSON(http.StatusOK, users)
+			return orz.Ok(c, users)
 		})
 
 		e.POST("/users", func(c echo.Context) error {
 			var user User
 			if err := c.Bind(&user); err != nil {
-				return c.JSON(http.StatusBadRequest, map[string]string{
-					"error": err.Error(),
-				})
+				return orz.BadRequest(c, err.Error())
 			}
 
 			if err := db.Create(&user).Error; err != nil {
-				return c.JSON(http.StatusInternalServerError, map[string]string{
-					"error": err.Error(),
-				})
+				return orz.InternalServerError(c, err.Error())
 			}
 
-			return c.JSON(http.StatusCreated, user)
+			return orz.Created(c, user)
 		})
 
 		return nil
