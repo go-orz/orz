@@ -1,0 +1,31 @@
+log:
+  level: "info"           # 日志级别: debug, info, warn, error
+  filename: "logs/app.log" # 日志文件路径
+  encode: "console"        # 编码格式: console, json
+  console: true           # 是否输出到控制台
+  maxSize: 100            # 日志文件最大大小(MB)
+  maxAge: 7               # 日志保留天数
+  compress: true          # 是否压缩历史日志
+
+database:
+  enabled: true
+  type: "sqlite"
+  showSql: true
+  sqlite:
+    path: "data/app.db"
+
+server:
+  addr: ":8081"                    # 服务器监听地址
+  tls:
+    enabled: false                 # 是否启用TLS
+    auto: false                    # 是否自动获取Let's Encrypt证书
+    cert: ""                       # TLS证书文件路径
+    key: ""                        # TLS私钥文件路径
+  ipExtractor: "X-Forwarded-For"   # IP提取方式: X-Forwarded-For, X-Real-IP
+  ipTrustList:                     # 信任的IP列表
+    - "127.0.0.1"
+    - "::1"
+
+app:
+  name: "ORZ Simple Example"
+  version: "1.0.0"
