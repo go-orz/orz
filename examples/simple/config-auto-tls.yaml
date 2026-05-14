@@ -22,7 +22,7 @@ server:
     cert: ""                       # 自动TLS时无需配置
     key: ""                        # 自动TLS时无需配置
   ipExtractor: "X-Forwarded-For"   # IP提取方式
-  ipTrustList:                     # 信任的IP列表
+  ipTrustList:                     # 可信代理 IP/CIDR 列表
     - "127.0.0.1"
     - "::1"
 

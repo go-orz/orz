@@ -22,7 +22,7 @@ server:
     cert: ""                       # TLS证书文件路径
     key: ""                        # TLS私钥文件路径
   ipExtractor: "X-Forwarded-For"   # IP提取方式: X-Forwarded-For, X-Real-IP
-  ipTrustList:                     # 信任的IP列表
+  ipTrustList:                     # 可信代理 IP/CIDR 列表
     - "127.0.0.1"
     - "::1"
 

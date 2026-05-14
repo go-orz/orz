@@ -128,7 +128,7 @@ func TestEnableHTTPTrustsSingleProxyIP(t *testing.T) {
 	}
 }
 
-func TestEnableHTTPTrustsDockerBridgeProxyCIDR(t *testing.T) {
+func TestEnableHTTPTrustsConfiguredProxyCIDR(t *testing.T) {
 	app := NewApp()
 	app.SetLogger(zap.NewNop())
 	if err := app.LoadConfigFromMap(map[string]interface{}{

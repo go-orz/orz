@@ -90,7 +90,7 @@ func (a *App) EnableHTTP() {
 		for _, ip := range ipTrustList {
 			ipNet, err := parseTrustedProxyIPRange(ip)
 			if err != nil {
-				a.Logger().Warn("failed to parse trusted proxy IP", zap.String("ip", ip), zap.Error(err))
+				a.Logger().Warn("failed to parse trusted proxy IP/CIDR", zap.String("ip", ip), zap.Error(err))
 				continue
 			}
 			options = append(options, echo.TrustIPRange(ipNet))
@@ -98,7 +98,7 @@ func (a *App) EnableHTTP() {
 		}
 
 		if trustedProxyCount > 0 {
-			a.Logger().Info("trusted proxy IPs configured", zap.Strings("trustedProxies", ipTrustList))
+			a.Logger().Info("trusted proxy IP/CIDR list configured", zap.Strings("trustedProxies", ipTrustList))
 		}
 
 		ipExtractor := strings.ToLower(strings.TrimSpace(config.Server.IPExtractor))

@@ -40,7 +40,7 @@ type ServerConfig struct {
 	Addr        string    `yaml:"addr" mapstructure:"addr"`
 	TLS         TLSConfig `yaml:"tls" mapstructure:"tls"`
 	IPExtractor string    `yaml:"ip_extractor" mapstructure:"ip_extractor"`
-	IPTrustList []string  `yaml:"ip_trust_list" mapstructure:"ip_trust_list"` // 可信代理 IP/CIDR，用于决定是否信任转发 IP 头
+	IPTrustList []string  `yaml:"ip_trust_list" mapstructure:"ip_trust_list"` // 可信代理 IP/CIDR 列表，用于决定是否信任转发 IP 头
 }
 
 type TLSConfig struct {
