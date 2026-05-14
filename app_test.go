@@ -96,11 +96,80 @@ func TestEnableHTTPUsesTrustedProxyHeadersWhenConfigured(t *testing.T) {
 
 	app.EnableHTTP()
 	req := httptest.NewRequest("GET", "http://example.com", nil)
-	req.RemoteAddr = "127.0.0.1:1234"
+	req.RemoteAddr = "10.0.0.2:1234"
 	req.Header.Set("X-Forwarded-For", "203.0.113.9, 10.0.0.2")
 
 	ip := app.GetEcho().IPExtractor(req)
 	if ip != "203.0.113.9" {
 		t.Fatalf("expected forwarded IP extraction, got %q", ip)
+	}
+}
+
+func TestEnableHTTPTrustsSingleProxyIP(t *testing.T) {
+	app := NewApp()
+	app.SetLogger(zap.NewNop())
+	if err := app.LoadConfigFromMap(map[string]interface{}{
+		"server": map[string]interface{}{
+			"ip_extractor":  "x-forwarded-for",
+			"ip_trust_list": []string{"127.0.0.1"},
+		},
+	}); err != nil {
+		t.Fatalf("LoadConfigFromMap returned error: %v", err)
+	}
+
+	app.EnableHTTP()
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	req.Header.Set("X-Forwarded-For", "203.0.113.9")
+
+	ip := app.GetEcho().IPExtractor(req)
+	if ip != "203.0.113.9" {
+		t.Fatalf("expected forwarded IP extraction, got %q", ip)
+	}
+}
+
+func TestEnableHTTPTrustsDockerBridgeProxyCIDR(t *testing.T) {
+	app := NewApp()
+	app.SetLogger(zap.NewNop())
+	if err := app.LoadConfigFromMap(map[string]interface{}{
+		"server": map[string]interface{}{
+			"ip_extractor":  "x-forwarded-for",
+			"ip_trust_list": []string{"172.16.0.0/12"},
+		},
+	}); err != nil {
+		t.Fatalf("LoadConfigFromMap returned error: %v", err)
+	}
+
+	app.EnableHTTP()
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "172.18.0.1:1234"
+	req.Header.Set("X-Forwarded-For", "198.51.100.77")
+
+	ip := app.GetEcho().IPExtractor(req)
+	if ip != "198.51.100.77" {
+		t.Fatalf("expected forwarded IP extraction, got %q", ip)
+	}
+}
+
+func TestEnableHTTPDoesNotTrustUnconfiguredPrivateProxyCIDR(t *testing.T) {
+	app := NewApp()
+	app.SetLogger(zap.NewNop())
+	if err := app.LoadConfigFromMap(map[string]interface{}{
+		"server": map[string]interface{}{
+			"ip_extractor":  "x-forwarded-for",
+			"ip_trust_list": []string{"10.0.0.0/8"},
+		},
+	}); err != nil {
+		t.Fatalf("LoadConfigFromMap returned error: %v", err)
+	}
+
+	app.EnableHTTP()
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "172.18.0.1:1234"
+	req.Header.Set("X-Forwarded-For", "198.51.100.77")
+
+	ip := app.GetEcho().IPExtractor(req)
+	if ip != "172.18.0.1" {
+		t.Fatalf("expected direct IP extraction, got %q", ip)
 	}
 }
