@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
 )
 
@@ -147,10 +149,89 @@ func (cm *ConfigManager) LoadFromMap(data map[string]interface{}) error {
 // GetConfig 获取配置
 func (cm *ConfigManager) GetConfig() *Config {
 	config := &Config{}
-	if err := cm.viper.Unmarshal(config); err != nil {
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		DecodeHook: mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToTimeDurationHookFunc(),
+			mapstructure.StringToSliceHookFunc(","),
+		),
+		MatchName:        matchConfigName,
+		Result:           config,
+		TagName:          "mapstructure",
+		WeaklyTypedInput: true,
+	})
+	if err != nil {
+		return nil
+	}
+	if err := decoder.Decode(normalizeConfigSettings(cm.viper.AllSettings(), cm.viper.InConfig)); err != nil {
 		return nil
 	}
 	return config
+}
+
+type configValue struct {
+	value any
+	rank  int
+}
+
+func normalizeConfigSettings(settings map[string]any, inConfig func(string) bool) map[string]any {
+	return normalizeConfigMap(settings, "", inConfig)
+}
+
+func normalizeConfigMap(settings map[string]any, parent string, inConfig func(string) bool) map[string]any {
+	result := make(map[string]any, len(settings))
+	values := make(map[string]configValue, len(settings))
+
+	keys := make([]string, 0, len(settings))
+	for key := range settings {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		path := key
+		if parent != "" {
+			path = parent + "." + key
+		}
+
+		value := settings[key]
+		if child, ok := value.(map[string]any); ok && !matchConfigName(path, "app") {
+			value = normalizeConfigMap(child, path, inConfig)
+		}
+
+		normalizedKey := normalizeConfigName(key)
+		current := configValue{
+			value: value,
+			rank:  configKeyRank(key, path, inConfig),
+		}
+		if previous, ok := values[normalizedKey]; !ok || current.rank >= previous.rank {
+			values[normalizedKey] = current
+			result[normalizedKey] = current.value
+		}
+	}
+
+	return result
+}
+
+func configKeyRank(key, path string, inConfig func(string) bool) int {
+	rank := 0
+	if inConfig(path) {
+		rank += 100
+	}
+	if strings.Contains(key, "_") {
+		rank += 10
+	}
+	return rank
+}
+
+func matchConfigName(mapKey, fieldName string) bool {
+	if strings.EqualFold(mapKey, fieldName) {
+		return true
+	}
+	return normalizeConfigName(mapKey) == normalizeConfigName(fieldName)
+}
+
+func normalizeConfigName(name string) string {
+	return strings.ReplaceAll(strings.ToLower(name), "_", "")
 }
 
 // Get 获取配置值
