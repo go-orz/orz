@@ -46,9 +46,6 @@ DATABASE:
   URL: file:test.db
 SERVER:
   Addr: :9090
-  TLS:
-    Enabled: true
-    Auto: true
   IPExtractor: x-real-ip
   IPTrustList:
     - 192.168.0.0/16
@@ -73,9 +70,6 @@ APP:
 	}
 	if cfg.Server.Addr != ":9090" {
 		t.Fatalf("expected Server.Addr to be loaded, got %q", cfg.Server.Addr)
-	}
-	if !cfg.Server.TLS.Enabled || !cfg.Server.TLS.Auto {
-		t.Fatalf("expected Server.TLS to be loaded, got %+v", cfg.Server.TLS)
 	}
 	if cfg.Server.IPExtractor != "x-real-ip" {
 		t.Fatalf("expected Server.IPExtractor to be loaded, got %q", cfg.Server.IPExtractor)

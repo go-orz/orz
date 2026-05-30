@@ -2,7 +2,6 @@ package orz
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -15,8 +14,6 @@ import (
 
 	"github.com/labstack/echo/v5"
 	"go.uber.org/zap"
-	"golang.org/x/crypto/acme"
-	"golang.org/x/crypto/acme/autocert"
 	"gorm.io/gorm"
 )
 
@@ -285,31 +282,8 @@ func (a *App) runHTTPServer(e *echo.Echo) error {
 		},
 	}
 
-	// 根据配置启动HTTP或HTTPS服务器
-	var err error
-	if config != nil && config.Server.TLS.Enabled {
-		if config.Server.TLS.Auto {
-			a.Logger().Info("starting HTTPS server with auto TLSConfig")
-			manager := autocert.Manager{Prompt: autocert.AcceptTOS}
-			startConfig.TLSConfig = &tls.Config{
-				MinVersion:     tls.VersionTLS12,
-				GetCertificate: manager.GetCertificate,
-				NextProtos:     []string{acme.ALPNProto, "h2"},
-			}
-			err = startConfig.Start(serverCtx, e)
-		} else if config.Server.TLS.Cert != "" && config.Server.TLS.Key != "" {
-			a.Logger().Info("starting HTTPS server with custom TLSConfig",
-				zap.String("cert", config.Server.TLS.Cert),
-				zap.String("key", config.Server.TLS.Key))
-			err = startConfig.StartTLS(serverCtx, e, config.Server.TLS.Cert, config.Server.TLS.Key)
-		} else {
-			a.Logger().Error("TLSConfig enabled but cert/key not provided, falling back to HTTP")
-			err = startConfig.Start(serverCtx, e)
-		}
-	} else {
-		err = startConfig.Start(serverCtx, e)
-	}
-
+	// 根据配置启动HTTP服务器
+	var err = startConfig.Start(serverCtx, e)
 	if err != nil {
 		if errors.Is(err, http.ErrServerClosed) || errors.Is(err, context.Canceled) {
 			a.Logger().Info("server stopped")

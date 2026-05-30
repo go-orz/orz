@@ -16,11 +16,6 @@ database:
 
 server:
   addr: ":8081"                    # 服务器监听地址
-  tls:
-    enabled: false                 # 是否启用TLS
-    auto: false                    # 是否自动获取Let's Encrypt证书
-    cert: ""                       # TLS证书文件路径
-    key: ""                        # TLS私钥文件路径
   ipExtractor: "X-Forwarded-For"   # IP提取方式: X-Forwarded-For, X-Real-IP
   ipTrustList:                     # 可信代理 IP/CIDR 列表
     - "127.0.0.1"
