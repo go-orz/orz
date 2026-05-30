@@ -2,6 +2,7 @@ package orz
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -12,8 +13,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/acme"
+	"golang.org/x/crypto/acme/autocert"
 	"gorm.io/gorm"
 )
 
@@ -74,8 +77,6 @@ func (a *App) EnableDatabase() error {
 // EnableHTTP 启用HTTP服务
 func (a *App) EnableHTTP() {
 	e := echo.New()
-	e.HideBanner = true
-	e.HidePort = true
 
 	// 应用服务器配置
 	config := a.GetConfig()
@@ -241,20 +242,15 @@ func (a *App) runHTTPServer(e *echo.Echo) error {
 	signalCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stopSignals()
 
-	watchCtx, stopWatch := context.WithCancel(context.Background())
-	defer stopWatch()
+	serverCtx, stopServer := context.WithCancel(context.Background())
+	defer stopServer()
 
 	var shutdownOnce sync.Once
 	shutdown := func() {
 		shutdownOnce.Do(func() {
 			a.Logger().Info("shutting down server...")
 			a.cancel()
-
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if err := e.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				a.Logger().Error("server forced to shutdown", zap.Error(err))
-			}
+			stopServer()
 		})
 	}
 
@@ -264,7 +260,7 @@ func (a *App) runHTTPServer(e *echo.Echo) error {
 			shutdown()
 		case <-a.ctx.Done():
 			shutdown()
-		case <-watchCtx.Done():
+		case <-serverCtx.Done():
 		}
 	}()
 
@@ -277,28 +273,45 @@ func (a *App) runHTTPServer(e *echo.Echo) error {
 
 	a.Logger().Info("starting server", zap.String("addr", addr))
 
+	startConfig := echo.StartConfig{
+		Address:         addr,
+		HideBanner:      true,
+		HidePort:        true,
+		GracefulTimeout: 10 * time.Second,
+		OnShutdownError: func(err error) {
+			if !errors.Is(err, http.ErrServerClosed) {
+				a.Logger().Error("server forced to shutdown", zap.Error(err))
+			}
+		},
+	}
+
 	// 根据配置启动HTTP或HTTPS服务器
 	var err error
 	if config != nil && config.Server.TLS.Enabled {
 		if config.Server.TLS.Auto {
 			a.Logger().Info("starting HTTPS server with auto TLSConfig")
-			err = e.StartAutoTLS(addr)
+			manager := autocert.Manager{Prompt: autocert.AcceptTOS}
+			startConfig.TLSConfig = &tls.Config{
+				MinVersion:     tls.VersionTLS12,
+				GetCertificate: manager.GetCertificate,
+				NextProtos:     []string{acme.ALPNProto, "h2"},
+			}
+			err = startConfig.Start(serverCtx, e)
 		} else if config.Server.TLS.Cert != "" && config.Server.TLS.Key != "" {
 			a.Logger().Info("starting HTTPS server with custom TLSConfig",
 				zap.String("cert", config.Server.TLS.Cert),
 				zap.String("key", config.Server.TLS.Key))
-			err = e.StartTLS(addr, config.Server.TLS.Cert, config.Server.TLS.Key)
+			err = startConfig.StartTLS(serverCtx, e, config.Server.TLS.Cert, config.Server.TLS.Key)
 		} else {
 			a.Logger().Error("TLSConfig enabled but cert/key not provided, falling back to HTTP")
-			err = e.Start(addr)
+			err = startConfig.Start(serverCtx, e)
 		}
 	} else {
-		err = e.Start(addr)
+		err = startConfig.Start(serverCtx, e)
 	}
 
-	stopWatch()
 	if err != nil {
-		if errors.Is(err, http.ErrServerClosed) {
+		if errors.Is(err, http.ErrServerClosed) || errors.Is(err, context.Canceled) {
 			a.Logger().Info("server stopped")
 			return nil
 		}

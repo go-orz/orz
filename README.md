@@ -33,7 +33,7 @@ import (
 
     "github.com/go-orz/orz"
     _ "github.com/go-orz/orz/drivers/sqlite"
-    "github.com/labstack/echo/v4"
+    "github.com/labstack/echo/v5"
 )
 
 type User struct {
@@ -51,7 +51,7 @@ func main() {
         }
 
         // 设置路由
-        e.GET("/", func(c echo.Context) error {
+        e.GET("/", func(c *echo.Context) error {
             return orz.Message(c, 200, "Hello from ORZ!")
         })
         

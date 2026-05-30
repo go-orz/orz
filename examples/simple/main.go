@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-orz/orz"
 	_ "github.com/go-orz/orz/drivers/sqlite"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // User 用户模型示例
@@ -31,11 +31,11 @@ func main() {
 		}
 
 		// 设置路由
-		e.GET("/", func(c echo.Context) error {
+		e.GET("/", func(c *echo.Context) error {
 			return orz.Message(c, 200, "Hello from ORZ framework!")
 		})
 
-		e.GET("/users", func(c echo.Context) error {
+		e.GET("/users", func(c *echo.Context) error {
 			var users []User
 			if err := db.Find(&users).Error; err != nil {
 				return orz.InternalServerError(c, err.Error())
@@ -43,7 +43,7 @@ func main() {
 			return orz.Ok(c, users)
 		})
 
-		e.POST("/users", func(c echo.Context) error {
+		e.POST("/users", func(c *echo.Context) error {
 			var user User
 			if err := c.Bind(&user); err != nil {
 				return orz.BadRequest(c, err.Error())

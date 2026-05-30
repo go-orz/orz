@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-orz/orz"
 	_ "github.com/go-orz/orz/drivers/sqlite"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"go.uber.org/zap"
 )
 
@@ -34,11 +34,11 @@ func (a *OptionDemoApp) Configure(app *orz.App) error {
 	// 获取Echo并设置路由
 	e := app.GetEcho()
 
-	e.GET("/", func(c echo.Context) error {
+	e.GET("/", func(c *echo.Context) error {
 		return orz.Message(c, 200, "Option Demo - Hello from ORZ!")
 	})
 
-	e.GET("/users", func(c echo.Context) error {
+	e.GET("/users", func(c *echo.Context) error {
 		var users []User
 		if err := db.Find(&users).Error; err != nil {
 			return orz.InternalServerError(c, err.Error())

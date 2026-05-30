@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-orz/orz"
 	_ "github.com/go-orz/orz/drivers/sqlite"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"gorm.io/gorm"
 )
 
@@ -147,7 +147,7 @@ func (a *CleanPagingDemoApp) Configure(app *orz.App) error {
 	productRepo := NewProductRepo(db)
 
 	// 连表查询：带分类信息的产品列表
-	e.GET("/products", func(c echo.Context) error {
+	e.GET("/products", func(c *echo.Context) error {
 		pageIndex := 1
 		pageSize := 10
 		keyword := c.QueryParam("keyword")
@@ -162,7 +162,7 @@ func (a *CleanPagingDemoApp) Configure(app *orz.App) error {
 	})
 
 	// 多条件查询：活跃产品
-	e.GET("/products/active", func(c echo.Context) error {
+	e.GET("/products/active", func(c *echo.Context) error {
 		pageIndex := 1
 		pageSize := 10
 		// 这里简化处理，实际可以从查询参数解析分类ID数组
@@ -177,7 +177,7 @@ func (a *CleanPagingDemoApp) Configure(app *orz.App) error {
 	})
 
 	// 基础查询：原类型产品列表
-	e.GET("/products/basic", func(c echo.Context) error {
+	e.GET("/products/basic", func(c *echo.Context) error {
 		pageIndex := 1
 		pageSize := 10
 
@@ -189,7 +189,7 @@ func (a *CleanPagingDemoApp) Configure(app *orz.App) error {
 		return orz.Ok(c, result)
 	})
 
-	e.GET("/", func(c echo.Context) error {
+	e.GET("/", func(c *echo.Context) error {
 		return orz.Ok(c, map[string]interface{}{
 			"description": "展示移除modifier后更清晰的API设计",
 			"endpoints": []string{

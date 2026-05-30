@@ -6,51 +6,51 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 // Ok 成功响应
-func Ok(c echo.Context, data interface{}) error {
+func Ok(c *echo.Context, data interface{}) error {
 	return c.JSON(http.StatusOK, data)
 }
 
 // Created 201成功响应
-func Created(c echo.Context, data interface{}) error {
+func Created(c *echo.Context, data interface{}) error {
 	return c.JSON(http.StatusCreated, data)
 }
 
 // Message 自定义状态码消息响应
-func Message(c echo.Context, status int, message string) error {
+func Message(c *echo.Context, status int, message string) error {
 	return writeMessage(c, status, message)
 }
 
 // ErrorResponse 错误响应
-func ErrorResponse(c echo.Context, code int, message string) error {
+func ErrorResponse(c *echo.Context, code int, message string) error {
 	return Message(c, code, message)
 }
 
 // BadRequest 400错误
-func BadRequest(c echo.Context, message string) error {
+func BadRequest(c *echo.Context, message string) error {
 	return ErrorResponse(c, http.StatusBadRequest, message)
 }
 
 // Unauthorized 401错误
-func Unauthorized(c echo.Context, message string) error {
+func Unauthorized(c *echo.Context, message string) error {
 	return ErrorResponse(c, http.StatusUnauthorized, message)
 }
 
 // Forbidden 403错误
-func Forbidden(c echo.Context, message string) error {
+func Forbidden(c *echo.Context, message string) error {
 	return ErrorResponse(c, http.StatusForbidden, message)
 }
 
 // NotFound 404错误
-func NotFound(c echo.Context, message string) error {
+func NotFound(c *echo.Context, message string) error {
 	return ErrorResponse(c, http.StatusNotFound, message)
 }
 
 // InternalServerError 500错误
-func InternalServerError(c echo.Context, message string) error {
+func InternalServerError(c *echo.Context, message string) error {
 	return ErrorResponse(c, http.StatusInternalServerError, message)
 }
 
@@ -64,7 +64,7 @@ type PageRequest struct {
 }
 
 // GetPageRequest 从查询参数获取分页信息（驼峰命名参数）
-func GetPageRequest(c echo.Context, allowedFields ...string) *PageRequest {
+func GetPageRequest(c *echo.Context, allowedFields ...string) *PageRequest {
 	var pr = &PageRequest{
 		PageIndex:         1,
 		PageSize:          10,
@@ -108,7 +108,7 @@ func GetPageRequest(c echo.Context, allowedFields ...string) *PageRequest {
 }
 
 // GetPageRequestUnderscore 从查询参数获取分页信息（下划线命名参数）
-func GetPageRequestUnderscore(c echo.Context, allowedFields ...string) *PageRequest {
+func GetPageRequestUnderscore(c *echo.Context, allowedFields ...string) *PageRequest {
 	var pr = &PageRequest{
 		PageIndex:         1,
 		PageSize:          10,
@@ -146,7 +146,7 @@ func GetPageRequestUnderscore(c echo.Context, allowedFields ...string) *PageRequ
 }
 
 // GetKeyword 从查询参数获取关键词搜索值
-func GetKeyword(c echo.Context, paramName ...string) string {
+func GetKeyword(c *echo.Context, paramName ...string) string {
 	keyName := "keyword"
 	if len(paramName) > 0 && paramName[0] != "" {
 		keyName = paramName[0]
@@ -155,7 +155,7 @@ func GetKeyword(c echo.Context, paramName ...string) string {
 }
 
 // BindAndValidate 绑定并验证请求数据
-func BindAndValidate(c echo.Context, v interface{}) error {
+func BindAndValidate(c *echo.Context, v interface{}) error {
 	if err := c.Bind(v); err != nil {
 		return fmt.Errorf("bind error: %w", err)
 	}
@@ -170,7 +170,7 @@ func BindAndValidate(c echo.Context, v interface{}) error {
 	return nil
 }
 
-func writeMessage(c echo.Context, status int, message string) error {
+func writeMessage(c *echo.Context, status int, message string) error {
 	if message == "" {
 		message = http.StatusText(status)
 	}

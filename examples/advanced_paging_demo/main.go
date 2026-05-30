@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-orz/orz"
 	_ "github.com/go-orz/orz/drivers/sqlite"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 	"gorm.io/gorm"
 )
 
@@ -119,7 +119,7 @@ func (a *AdvancedPagingDemoApp) Configure(app *orz.App) error {
 	licenseRepo := NewLicenseRepo(db)
 
 	// 连表查询：带创建者信息的许可证列表
-	e.GET("/licenses", func(c echo.Context) error {
+	e.GET("/licenses", func(c *echo.Context) error {
 		pageIndex := 1
 		pageSize := 10
 		keyword := c.QueryParam("keyword")
@@ -133,7 +133,7 @@ func (a *AdvancedPagingDemoApp) Configure(app *orz.App) error {
 	})
 
 	// 基础查询：原类型的许可证列表
-	e.GET("/licenses/basic", func(c echo.Context) error {
+	e.GET("/licenses/basic", func(c *echo.Context) error {
 		pageIndex := 1
 		pageSize := 10
 		typeFilter := c.QueryParam("type")
@@ -146,7 +146,7 @@ func (a *AdvancedPagingDemoApp) Configure(app *orz.App) error {
 		return orz.Ok(c, result)
 	})
 
-	e.GET("/", func(c echo.Context) error {
+	e.GET("/", func(c *echo.Context) error {
 		return orz.Ok(c, map[string]interface{}{
 			"description": "使用优雅的PageBuilder进行分页查询",
 			"endpoints": []string{
