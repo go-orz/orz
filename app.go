@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -75,91 +73,13 @@ func (a *App) EnableDatabase() error {
 func (a *App) EnableHTTP() {
 	e := echo.New()
 
-	// 应用服务器配置
-	config := a.GetConfig()
-	if config != nil {
-		ipTrustList := config.Server.IPTrustList
-		options := []echo.TrustOption{
-			echo.TrustLoopback(false),
-			echo.TrustLinkLocal(false),
-			echo.TrustPrivateNet(false),
-		}
-		trustedProxyCount := 0
-		for _, ip := range ipTrustList {
-			ipNet, err := parseTrustedProxyIPRange(ip)
-			if err != nil {
-				a.Logger().Warn("failed to parse trusted proxy IP/CIDR", zap.String("ip", ip), zap.Error(err))
-				continue
-			}
-			options = append(options, echo.TrustIPRange(ipNet))
-			trustedProxyCount++
-		}
-
-		if trustedProxyCount > 0 {
-			a.Logger().Info("trusted proxy IP/CIDR list configured", zap.Strings("trustedProxies", ipTrustList))
-		}
-
-		ipExtractor := strings.ToLower(strings.TrimSpace(config.Server.IPExtractor))
-		if ipExtractor == "" {
-			ipExtractor = "direct"
-		}
-
-		switch ipExtractor {
-		case "x-forwarded-for":
-			if trustedProxyCount == 0 {
-				a.Logger().Warn("x-forwarded-for extractor requested without trusted proxies; falling back to direct")
-				e.IPExtractor = echo.ExtractIPDirect()
-				break
-			}
-			e.IPExtractor = echo.ExtractIPFromXFFHeader(options...)
-		case "x-real-ip":
-			if trustedProxyCount == 0 {
-				a.Logger().Warn("x-real-ip extractor requested without trusted proxies; falling back to direct")
-				e.IPExtractor = echo.ExtractIPDirect()
-				break
-			}
-			e.IPExtractor = echo.ExtractIPFromRealIPHeader(options...)
-		case "direct":
-			e.IPExtractor = echo.ExtractIPDirect()
-		default:
-			a.Logger().Warn("unknown IP extractor; falling back to direct", zap.String("ipExtractor", config.Server.IPExtractor))
-			e.IPExtractor = echo.ExtractIPDirect()
-		}
+	if config := a.GetConfig(); config != nil {
+		configureIPExtractor(e, config.Server, a.Logger())
 	}
 
-	if e.IPExtractor == nil {
-		e.IPExtractor = echo.ExtractIPDirect()
-	}
+	ensureDirectIPExtractor(e)
 
 	a.SetEcho(e)
-}
-
-func parseTrustedProxyIPRange(value string) (*net.IPNet, error) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return nil, fmt.Errorf("empty IP range")
-	}
-
-	if _, ipNet, err := net.ParseCIDR(value); err == nil {
-		return ipNet, nil
-	}
-
-	ip := net.ParseIP(value)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid IP or CIDR")
-	}
-
-	if ip4 := ip.To4(); ip4 != nil {
-		return &net.IPNet{
-			IP:   ip4,
-			Mask: net.CIDRMask(32, 32),
-		}, nil
-	}
-
-	return &net.IPNet{
-		IP:   ip,
-		Mask: net.CIDRMask(128, 128),
-	}, nil
 }
 
 // SetDatabase 设置数据库连接

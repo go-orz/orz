@@ -60,7 +60,7 @@ func TestRunReturnsHTTPStartError(t *testing.T) {
 	}
 }
 
-func TestEnableHTTPFallsBackToDirectIPExtractionWithoutTrustedProxies(t *testing.T) {
+func TestEnableHTTPUsesXForwardedForWithoutTrustedProxies(t *testing.T) {
 	app := NewApp()
 	app.SetLogger(zap.NewNop())
 	if err := app.LoadConfigFromMap(map[string]interface{}{
@@ -77,8 +77,8 @@ func TestEnableHTTPFallsBackToDirectIPExtractionWithoutTrustedProxies(t *testing
 	req.Header.Set("X-Forwarded-For", "203.0.113.9")
 
 	ip := app.GetEcho().IPExtractor(req)
-	if ip != "10.0.0.2" {
-		t.Fatalf("expected direct IP extraction, got %q", ip)
+	if ip != "203.0.113.9" {
+		t.Fatalf("expected forwarded IP extraction, got %q", ip)
 	}
 }
 
@@ -170,6 +170,71 @@ func TestEnableHTTPDoesNotTrustUnconfiguredPrivateProxyCIDR(t *testing.T) {
 
 	ip := app.GetEcho().IPExtractor(req)
 	if ip != "172.18.0.1" {
+		t.Fatalf("expected direct IP extraction, got %q", ip)
+	}
+}
+
+func TestEnableHTTPUsesCustomIPHeader(t *testing.T) {
+	app := NewApp()
+	app.SetLogger(zap.NewNop())
+	if err := app.LoadConfigFromMap(map[string]interface{}{
+		"server": map[string]interface{}{
+			"ip_extractor": "X-Client-IP",
+		},
+	}); err != nil {
+		t.Fatalf("LoadConfigFromMap returned error: %v", err)
+	}
+
+	app.EnableHTTP()
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.0.0.2:1234"
+	req.Header.Set("X-Client-IP", "203.0.113.9")
+
+	ip := app.GetEcho().IPExtractor(req)
+	if ip != "203.0.113.9" {
+		t.Fatalf("expected custom header IP extraction, got %q", ip)
+	}
+}
+
+func TestEnableHTTPCustomIPHeaderFallsBackToDirectWhenHeaderMissing(t *testing.T) {
+	app := NewApp()
+	app.SetLogger(zap.NewNop())
+	if err := app.LoadConfigFromMap(map[string]interface{}{
+		"server": map[string]interface{}{
+			"ip_extractor": "X-Client-IP",
+		},
+	}); err != nil {
+		t.Fatalf("LoadConfigFromMap returned error: %v", err)
+	}
+
+	app.EnableHTTP()
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.0.0.2:1234"
+
+	ip := app.GetEcho().IPExtractor(req)
+	if ip != "10.0.0.2" {
+		t.Fatalf("expected direct IP extraction, got %q", ip)
+	}
+}
+
+func TestEnableHTTPUsesDirectIPExtractionWhenExtractorIsBlank(t *testing.T) {
+	app := NewApp()
+	app.SetLogger(zap.NewNop())
+	if err := app.LoadConfigFromMap(map[string]interface{}{
+		"server": map[string]interface{}{
+			"ip_extractor": " ",
+		},
+	}); err != nil {
+		t.Fatalf("LoadConfigFromMap returned error: %v", err)
+	}
+
+	app.EnableHTTP()
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.0.0.2:1234"
+	req.Header.Set("X-Forwarded-For", "203.0.113.9")
+
+	ip := app.GetEcho().IPExtractor(req)
+	if ip != "10.0.0.2" {
 		t.Fatalf("expected direct IP extraction, got %q", ip)
 	}
 }

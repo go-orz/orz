@@ -16,7 +16,7 @@ database:
 
 server:
   addr: ":8081"                    # 服务器监听地址
-  ipExtractor: "X-Forwarded-For"   # IP提取方式: X-Forwarded-For, X-Real-IP
+  ipExtractor: "X-Forwarded-For"   # IP提取方式: direct, X-Forwarded-For, X-Real-IP，或自定义 Header 名称
   ipTrustList:                     # 可信代理 IP/CIDR 列表
     - "127.0.0.1"
     - "::1"
