@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v5"
-	"go.uber.org/zap"
 )
 
 const (
@@ -16,27 +15,53 @@ const (
 	ipExtractorXRealIP       = "x-real-ip"
 )
 
-func configureIPExtractor(e *echo.Echo, server ServerConfig, logger *zap.Logger) {
-	trustOptions, trustedProxies := buildTrustedProxyOptions(server.IPTrustList, logger)
-	if len(trustedProxies) > 0 {
-		logger.Info("trusted proxy IP/CIDR list configured", zap.Strings("trustedProxies", trustedProxies))
-	}
+// ClientIPs contains client IP values extracted with each built-in strategy.
+type ClientIPs struct {
+	Direct        string `json:"direct"`
+	XRealIP       string `json:"x-real-ip"`
+	XForwardedFor string `json:"x-forwarded-for"`
+}
 
-	switch extractor := normalizeIPExtractor(server.IPExtractor); strings.ToLower(extractor) {
+// NewIPExtractor returns an Echo IP extractor from the configured extractor name and trusted proxy list.
+func NewIPExtractor(ipExtractor string, ipTrustList []string) echo.IPExtractor {
+	trustOptions := buildTrustedProxyOptions(ipTrustList)
+
+	switch extractor := normalizeIPExtractor(ipExtractor); strings.ToLower(extractor) {
 	case ipExtractorXForwardedFor:
-		e.IPExtractor = echo.ExtractIPFromXFFHeader(trustOptions...)
+		return echo.ExtractIPFromXFFHeader(trustOptions...)
 	case ipExtractorXRealIP:
-		e.IPExtractor = echo.ExtractIPFromRealIPHeader(trustOptions...)
+		return echo.ExtractIPFromRealIPHeader(trustOptions...)
 	case ipExtractorDirect:
-		e.IPExtractor = echo.ExtractIPDirect()
+		return echo.ExtractIPDirect()
 	default:
-		e.IPExtractor = extractIPFromHeader(extractor, trustOptions...)
+		return extractIPFromHeader(extractor, trustOptions...)
 	}
 }
 
-func buildTrustedProxyOptions(ipTrustList []string, logger *zap.Logger) ([]echo.TrustOption, []string) {
+// ExtractClientIPs extracts direct, X-Real-IP, and X-Forwarded-For IP values using the same trusted proxy list.
+func ExtractClientIPs(req *http.Request, ipTrustList []string) ClientIPs {
+	trustOptions := buildTrustedProxyOptions(ipTrustList)
+
+	return ClientIPs{
+		Direct:        echo.ExtractIPDirect()(req),
+		XRealIP:       echo.ExtractIPFromRealIPHeader(trustOptions...)(req),
+		XForwardedFor: echo.ExtractIPFromXFFHeader(trustOptions...)(req),
+	}
+}
+
+// ExtractClientIPMap extracts direct, X-Real-IP, and X-Forwarded-For IP values using map keys suitable for JSON responses.
+func ExtractClientIPMap(req *http.Request, ipTrustList []string) map[string]string {
+	ips := ExtractClientIPs(req, ipTrustList)
+	return map[string]string{
+		ipExtractorDirect:        ips.Direct,
+		ipExtractorXRealIP:       ips.XRealIP,
+		ipExtractorXForwardedFor: ips.XForwardedFor,
+	}
+}
+
+func buildTrustedProxyOptions(ipTrustList []string) []echo.TrustOption {
 	if len(ipTrustList) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	options := []echo.TrustOption{
@@ -45,19 +70,16 @@ func buildTrustedProxyOptions(ipTrustList []string, logger *zap.Logger) ([]echo.
 		echo.TrustPrivateNet(false),
 	}
 
-	trustedProxies := make([]string, 0, len(ipTrustList))
 	for _, value := range ipTrustList {
 		ipRange, err := parseTrustedProxyIPRange(value)
 		if err != nil {
-			logger.Warn("failed to parse trusted proxy IP/CIDR", zap.String("ip", value), zap.Error(err))
 			continue
 		}
 
 		options = append(options, echo.TrustIPRange(ipRange))
-		trustedProxies = append(trustedProxies, strings.TrimSpace(value))
 	}
 
-	return options, trustedProxies
+	return options
 }
 
 func normalizeIPExtractor(value string) string {

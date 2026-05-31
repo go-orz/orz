@@ -74,7 +74,7 @@ func (a *App) EnableHTTP() {
 	e := echo.New()
 
 	if config := a.GetConfig(); config != nil {
-		configureIPExtractor(e, config.Server, a.Logger())
+		e.IPExtractor = NewIPExtractor(config.Server.IPExtractor, config.Server.IPTrustList)
 	}
 
 	ensureDirectIPExtractor(e)

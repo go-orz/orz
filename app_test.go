@@ -238,3 +238,67 @@ func TestEnableHTTPUsesDirectIPExtractionWhenExtractorIsBlank(t *testing.T) {
 		t.Fatalf("expected direct IP extraction, got %q", ip)
 	}
 }
+
+func TestNewIPExtractorUsesExtractorAndTrustList(t *testing.T) {
+	extractor := NewIPExtractor("x-forwarded-for", []string{"10.0.0.0/8"})
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.0.0.2:1234"
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 10.0.0.2")
+
+	ip := extractor(req)
+	if ip != "203.0.113.9" {
+		t.Fatalf("expected forwarded IP extraction, got %q", ip)
+	}
+}
+
+func TestNewIPExtractorUsesCustomHeader(t *testing.T) {
+	extractor := NewIPExtractor("X-Client-IP", nil)
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.0.0.2:1234"
+	req.Header.Set("X-Client-IP", "203.0.113.9")
+
+	ip := extractor(req)
+	if ip != "203.0.113.9" {
+		t.Fatalf("expected custom header IP extraction, got %q", ip)
+	}
+}
+
+func TestExtractClientIPs(t *testing.T) {
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.0.0.2:1234"
+	req.Header.Set("X-Real-IP", "198.51.100.77")
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 10.0.0.2")
+
+	ips := ExtractClientIPs(req, []string{"10.0.0.0/8", "198.51.100.0/24"})
+
+	if ips.Direct != "10.0.0.2" {
+		t.Fatalf("expected direct IP extraction, got %q", ips.Direct)
+	}
+	if ips.XRealIP != "198.51.100.77" {
+		t.Fatalf("expected X-Real-IP extraction, got %q", ips.XRealIP)
+	}
+	if ips.XForwardedFor != "203.0.113.9" {
+		t.Fatalf("expected X-Forwarded-For extraction, got %q", ips.XForwardedFor)
+	}
+}
+
+func TestExtractClientIPMap(t *testing.T) {
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.0.0.2:1234"
+	req.Header.Set("X-Real-IP", "198.51.100.77")
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 10.0.0.2")
+
+	ips := ExtractClientIPMap(req, []string{"10.0.0.0/8", "198.51.100.0/24"})
+
+	if ips["direct"] != "10.0.0.2" {
+		t.Fatalf("expected direct IP extraction, got %q", ips["direct"])
+	}
+	if ips["x-real-ip"] != "198.51.100.77" {
+		t.Fatalf("expected X-Real-IP extraction, got %q", ips["x-real-ip"])
+	}
+	if ips["x-forwarded-for"] != "203.0.113.9" {
+		t.Fatalf("expected X-Forwarded-For extraction, got %q", ips["x-forwarded-for"])
+	}
+}
