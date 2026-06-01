@@ -64,12 +64,7 @@ func buildTrustedProxyOptions(ipTrustList []string) []echo.TrustOption {
 		return nil
 	}
 
-	options := []echo.TrustOption{
-		echo.TrustLoopback(false),
-		echo.TrustLinkLocal(false),
-		echo.TrustPrivateNet(false),
-	}
-
+	options := make([]echo.TrustOption, 0, len(ipTrustList))
 	for _, value := range ipTrustList {
 		ipRange, err := parseTrustedProxyIPRange(value)
 		if err != nil {

@@ -95,5 +95,5 @@ database:
 server:
   addr: ":8080"
   ip_extractor: "direct"           # direct, x-forwarded-for, x-real-ip，或自定义 Header 名称
-  ip_trust_list: []                # 可信代理 IP/CIDR 列表
+  ip_trust_list: []                # 额外可信代理 IP/CIDR 列表；回环、链路本地、私网代理默认可信
 ```

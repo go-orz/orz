@@ -151,13 +151,13 @@ func TestEnableHTTPTrustsConfiguredProxyCIDR(t *testing.T) {
 	}
 }
 
-func TestEnableHTTPDoesNotTrustUnconfiguredPrivateProxyCIDR(t *testing.T) {
+func TestEnableHTTPKeepsDefaultInfrastructureTrustWhenTrustListConfigured(t *testing.T) {
 	app := NewApp()
 	app.SetLogger(zap.NewNop())
 	if err := app.LoadConfigFromMap(map[string]interface{}{
 		"server": map[string]interface{}{
 			"ip_extractor":  "x-forwarded-for",
-			"ip_trust_list": []string{"10.0.0.0/8"},
+			"ip_trust_list": []string{"203.0.113.0/24"},
 		},
 	}); err != nil {
 		t.Fatalf("LoadConfigFromMap returned error: %v", err)
@@ -169,7 +169,30 @@ func TestEnableHTTPDoesNotTrustUnconfiguredPrivateProxyCIDR(t *testing.T) {
 	req.Header.Set("X-Forwarded-For", "198.51.100.77")
 
 	ip := app.GetEcho().IPExtractor(req)
-	if ip != "172.18.0.1" {
+	if ip != "198.51.100.77" {
+		t.Fatalf("expected forwarded IP extraction, got %q", ip)
+	}
+}
+
+func TestEnableHTTPDoesNotTrustUnconfiguredPublicProxyCIDR(t *testing.T) {
+	app := NewApp()
+	app.SetLogger(zap.NewNop())
+	if err := app.LoadConfigFromMap(map[string]interface{}{
+		"server": map[string]interface{}{
+			"ip_extractor":  "x-forwarded-for",
+			"ip_trust_list": []string{"198.51.100.0/24"},
+		},
+	}); err != nil {
+		t.Fatalf("LoadConfigFromMap returned error: %v", err)
+	}
+
+	app.EnableHTTP()
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "203.0.113.10:1234"
+	req.Header.Set("X-Forwarded-For", "192.0.2.99")
+
+	ip := app.GetEcho().IPExtractor(req)
+	if ip != "203.0.113.10" {
 		t.Fatalf("expected direct IP extraction, got %q", ip)
 	}
 }
