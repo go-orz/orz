@@ -81,6 +81,10 @@ HTTP helper 默认行为：
 
 ### 配置文件 (config.yaml)
 
+数据库连接池由框架统一配置，适用于所有注册驱动和数据库连接入口。省略 `database.pool` 时默认最多打开 30 个连接、保留 10 个空闲连接，连接最长存活 3600 秒，最大空闲时间 300 秒。直接调用 `ConnectDatabase` 等函数也使用相同默认值。
+
+各字段使用非指针整数类型，可单独用正值覆盖；未配置或设为 `0` 时使用对应默认值，旧部署无需修改配置文件。负值或超出可表示范围的时间会返回错误；最大空闲连接数超过最大打开连接数时自动收紧。限制按连接池生效，多实例部署需预留 PostgreSQL 管理连接和其他服务连接的容量。
+
 ```yaml
 log:
   level: "info"
@@ -89,6 +93,11 @@ log:
 database:
   enabled: true
   type: "sqlite"
+  pool:
+    max_open_conns: 30
+    max_idle_conns: 10
+    conn_max_lifetime_seconds: 3600
+    conn_max_idle_time_seconds: 300
   sqlite:
     path: "data/app.db"
 

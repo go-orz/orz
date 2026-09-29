@@ -55,13 +55,21 @@ type LogConfig struct {
 }
 
 type DatabaseConfig struct {
-	Enabled  bool         `yaml:"enabled" mapstructure:"enabled"`
-	Type     DatabaseType `yaml:"type" mapstructure:"type"`
-	URL      string       `yaml:"url" mapstructure:"url"`
-	Mysql    MysqlCfg     `yaml:"mysql" mapstructure:"mysql"`
-	Sqlite   SqliteConfig `yaml:"sqlite" mapstructure:"sqlite"`
-	Postgres PostgresCfg  `yaml:"postgres" mapstructure:"postgres"`
-	ShowSql  bool         `yaml:"show_sql" mapstructure:"show_sql"`
+	Enabled  bool               `yaml:"enabled" mapstructure:"enabled"`
+	Type     DatabaseType       `yaml:"type" mapstructure:"type"`
+	URL      string             `yaml:"url" mapstructure:"url"`
+	Mysql    MysqlCfg           `yaml:"mysql" mapstructure:"mysql"`
+	Sqlite   SqliteConfig       `yaml:"sqlite" mapstructure:"sqlite"`
+	Postgres PostgresCfg        `yaml:"postgres" mapstructure:"postgres"`
+	ShowSql  bool               `yaml:"show_sql" mapstructure:"show_sql"`
+	Pool     DatabasePoolConfig `yaml:"pool" mapstructure:"pool"`
+}
+
+type DatabasePoolConfig struct {
+	MaxOpenConns           int `yaml:"max_open_conns" mapstructure:"max_open_conns"`
+	MaxIdleConns           int `yaml:"max_idle_conns" mapstructure:"max_idle_conns"`
+	ConnMaxLifetimeSeconds int `yaml:"conn_max_lifetime_seconds" mapstructure:"conn_max_lifetime_seconds"`
+	ConnMaxIdleTimeSeconds int `yaml:"conn_max_idle_time_seconds" mapstructure:"conn_max_idle_time_seconds"`
 }
 
 type MysqlCfg struct {

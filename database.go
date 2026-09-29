@@ -65,7 +65,42 @@ func ConnectSqlite(url string, cfg SqliteConfig, logger gormlogger.Interface) (*
 }
 
 func connectDatabaseWithGormLogger(cfg DatabaseConfig, logger gormlogger.Interface) (*gorm.DB, error) {
-	return openDatabase(cfg, logger)
+	pool, err := resolveDatabasePool(cfg.Pool)
+	if err != nil {
+		return nil, err
+	}
+	db, err := openDatabase(cfg, logger)
+	if err != nil {
+		return nil, err
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("get database connection pool: %w", err)
+	}
+	sqlDB.SetMaxOpenConns(pool[0])
+	sqlDB.SetMaxIdleConns(pool[1])
+	sqlDB.SetConnMaxLifetime(time.Duration(pool[2]) * time.Second)
+	sqlDB.SetConnMaxIdleTime(time.Duration(pool[3]) * time.Second)
+	return db, nil
+}
+
+func resolveDatabasePool(cfg DatabasePoolConfig) ([4]int, error) {
+	values := [4]int{30, 10, 3600, 300}
+	configured := []int{cfg.MaxOpenConns, cfg.MaxIdleConns, cfg.ConnMaxLifetimeSeconds, cfg.ConnMaxIdleTimeSeconds}
+	names := []string{"max_open_conns", "max_idle_conns", "conn_max_lifetime_seconds", "conn_max_idle_time_seconds"}
+	for index, value := range configured {
+		if value == 0 {
+			continue
+		}
+		if value < 0 || (index >= 2 && int64(value) > int64(time.Duration(1<<63-1)/time.Second)) {
+			return values, fmt.Errorf("invalid database.pool.%s: %d", names[index], value)
+		}
+		values[index] = value
+	}
+	if values[0] > 0 && values[1] > values[0] {
+		values[1] = values[0]
+	}
+	return values, nil
 }
 
 // GormLogger GORM 日志适配器

@@ -1,6 +1,7 @@
 package orz
 
 import (
+	"database/sql"
 	"testing"
 
 	"gorm.io/gorm"
@@ -25,7 +26,7 @@ func (a *frameworkOrderApp) Configure(app *App) error {
 func TestNewFrameworkInitializesDependenciesBeforeApplication(t *testing.T) {
 	withIsolatedDatabaseDrivers(t)
 	RegisterDatabaseDriver(func(cfg DatabaseConfig, logger gormlogger.Interface) (*gorm.DB, error) {
-		return &gorm.DB{}, nil
+		return &gorm.DB{Config: &gorm.Config{ConnPool: &sql.DB{}}}, nil
 	}, DatabaseType("stub"))
 
 	application := &frameworkOrderApp{}

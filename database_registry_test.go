@@ -1,6 +1,7 @@
 package orz
 
 import (
+	"database/sql"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 	"strings"
@@ -28,7 +29,7 @@ func TestConnectDatabaseUsesRegisteredDriver(t *testing.T) {
 		if cfg.Type != DatabaseMysql {
 			t.Fatalf("unexpected database type: %s", cfg.Type)
 		}
-		return &gorm.DB{}, nil
+		return &gorm.DB{Config: &gorm.Config{ConnPool: &sql.DB{}}}, nil
 	}, DatabaseMysql)
 
 	db, err := ConnectDatabase(DatabaseConfig{Type: DatabaseMysql})
@@ -40,6 +41,13 @@ func TestConnectDatabaseUsesRegisteredDriver(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("expected registered opener to be called")
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := sqlDB.Stats().MaxOpenConnections; got != 30 {
+		t.Fatalf("expected max open connections 30, got %d", got)
 	}
 }
 
