@@ -195,6 +195,12 @@ func (a *App) runHTTPServer(e *echo.Echo) error {
 		HideBanner:      true,
 		HidePort:        true,
 		GracefulTimeout: 10 * time.Second,
+		BeforeServeFunc: func(server *http.Server) error {
+			if config != nil {
+				config.Server.configureHTTPServer(server)
+			}
+			return nil
+		},
 		OnShutdownError: func(err error) {
 			if !errors.Is(err, http.ErrServerClosed) {
 				a.Logger().Error("server forced to shutdown", zap.Error(err))
@@ -231,4 +237,23 @@ func (a *App) runDaemon() error {
 	}
 
 	return nil
+}
+
+// configureHTTPServer only overrides explicitly configured positive values.
+func (c ServerConfig) configureHTTPServer(server *http.Server) {
+	if c.ReadHeaderTimeout > 0 {
+		server.ReadHeaderTimeout = c.ReadHeaderTimeout
+	}
+	if c.ReadTimeout > 0 {
+		server.ReadTimeout = c.ReadTimeout
+	}
+	if c.WriteTimeout > 0 {
+		server.WriteTimeout = c.WriteTimeout
+	}
+	if c.IdleTimeout > 0 {
+		server.IdleTimeout = c.IdleTimeout
+	}
+	if c.MaxHeaderBytes > 0 {
+		server.MaxHeaderBytes = c.MaxHeaderBytes
+	}
 }

@@ -1,8 +1,12 @@
 package orz
 
 import (
+	"github.com/labstack/echo/v5"
+	"io"
 	"net"
+	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -323,5 +327,86 @@ func TestExtractClientIPMap(t *testing.T) {
 	}
 	if ips["x-forwarded-for"] != "203.0.113.9" {
 		t.Fatalf("expected X-Forwarded-For extraction, got %q", ips["x-forwarded-for"])
+	}
+}
+
+func TestServerReadTimeoutConfiguration(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		seconds, status int
+	}{
+		{"configured deadline expires", 1, 408},
+		{"longer deadline allows upload", 2, 200},
+		{"default allows upload", 0, 200},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			addr := listener.Addr().String()
+			listener.Close()
+			app := NewApp()
+			app.SetLogger(zap.NewNop())
+			if err := app.LoadConfigFromMap(map[string]interface{}{"server": map[string]interface{}{"addr": addr, "read_timeout": (time.Duration(tc.seconds) * time.Second).String()}}); err != nil {
+				t.Fatal(err)
+			}
+			if app.GetConfig().Server.ReadTimeout != time.Duration(tc.seconds)*time.Second {
+				t.Fatal("read timeout configuration was not loaded")
+			}
+			app.EnableHTTP()
+			e := app.GetEcho()
+			e.GET("/health", func(c *echo.Context) error { return c.NoContent(200) })
+			e.POST("/upload", func(c *echo.Context) error {
+				if _, err := io.ReadAll(c.Request().Body); err != nil {
+					return c.NoContent(408)
+				}
+				return c.NoContent(200)
+			})
+			done := make(chan error, 1)
+			go func() { done <- app.Run() }()
+			defer func() {
+				app.cancel()
+				select {
+				case err := <-done:
+					if err != nil {
+						t.Errorf("shutdown: %v", err)
+					}
+				case <-time.After(3 * time.Second):
+					t.Error("server did not stop")
+				}
+			}()
+			client := &http.Client{Timeout: 3 * time.Second}
+			deadline := time.Now().Add(3 * time.Second)
+			for {
+				resp, err := client.Get("http://" + addr + "/health")
+				if err == nil {
+					resp.Body.Close()
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatal(err)
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			reader, writer := io.Pipe()
+			written := make(chan struct{})
+			go func() {
+				defer close(written)
+				defer writer.Close()
+				time.Sleep(1200 * time.Millisecond)
+				_, _ = io.Copy(writer, strings.NewReader("{}"))
+			}()
+			resp, err := client.Post("http://"+addr+"/upload", "application/json", reader)
+			reader.Close()
+			<-written
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != tc.status {
+				t.Fatalf("status = %d, want %d", resp.StatusCode, tc.status)
+			}
+		})
 	}
 }

@@ -102,6 +102,12 @@ database:
     path: "data/app.db"
 
 server:
+  # 以下参数默认均为 0：不覆盖 Echo/http.Server 默认值；只有正值生效。
+  read_header_timeout: 0 # 请求头读取期限（如 30s、2m）
+  read_timeout: 0        # 完整请求（含请求体）读取期限（如 30s、2m）
+  write_timeout: 0       # 响应写入期限（如 30s、2m）
+  idle_timeout: 0        # Keep-Alive 空闲期限（如 30s、2m）
+  max_header_bytes: 0           # 请求头大小上限（字节）
   addr: ":8080"
   ip_extractor: "direct"           # direct, x-forwarded-for, x-real-ip，或自定义 Header 名称
   ip_trust_list: []                # 额外可信代理 IP/CIDR 列表；回环、链路本地、私网代理默认可信

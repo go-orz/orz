@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
@@ -38,10 +39,17 @@ type Config struct {
 	App      AppConfig      `yaml:"app" mapstructure:"app"`           // 应用程序个性化配置
 }
 
+// ServerConfig 的超时使用 Go duration 字符串（例如 30s、2m），MaxHeaderBytes 单位为字节。
+// 数值为 0 或未配置时，不覆盖 Echo/http.Server 的默认值。
 type ServerConfig struct {
-	Addr        string   `yaml:"addr" mapstructure:"addr"`
-	IPExtractor string   `yaml:"ip_extractor" mapstructure:"ip_extractor"`
-	IPTrustList []string `yaml:"ip_trust_list" mapstructure:"ip_trust_list"` // 可信代理 IP/CIDR 列表，用于决定是否信任转发 IP 头
+	Addr              string        `yaml:"addr" mapstructure:"addr"`
+	ReadHeaderTimeout time.Duration `yaml:"read_header_timeout" mapstructure:"read_header_timeout"`
+	ReadTimeout       time.Duration `yaml:"read_timeout" mapstructure:"read_timeout"`
+	WriteTimeout      time.Duration `yaml:"write_timeout" mapstructure:"write_timeout"`
+	IdleTimeout       time.Duration `yaml:"idle_timeout" mapstructure:"idle_timeout"`
+	MaxHeaderBytes    int           `yaml:"max_header_bytes" mapstructure:"max_header_bytes"`
+	IPExtractor       string        `yaml:"ip_extractor" mapstructure:"ip_extractor"`
+	IPTrustList       []string      `yaml:"ip_trust_list" mapstructure:"ip_trust_list"` // 可信代理 IP/CIDR 列表，用于决定是否信任转发 IP 头
 }
 
 type LogConfig struct {
